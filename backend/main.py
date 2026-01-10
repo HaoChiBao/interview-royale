@@ -73,7 +73,8 @@ class ConnectionManager:
     async def broadcast_to_room(self, room_code: str, message: dict):
         if not room_code: return
         
-        for connection, data in self.active_connections.items():
+        # Iterate over a copy to avoid RuntimeError if connections close during iteration
+        for connection, data in list(self.active_connections.items()):
             if data.get("room_code") == room_code:
                 try:
                     await connection.send_json(message)
@@ -84,7 +85,7 @@ class ConnectionManager:
         if not room_code: return
 
         players_list = []
-        for _, data in self.active_connections.items():
+        for _, data in list(self.active_connections.items()):
             if data.get("room_code") == room_code and data.get("username"):
                 players_list.append({"username": data["username"]})
         
@@ -145,11 +146,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 room_code = data.get("room_code", "").upper()
                 
                 if room_code not in games:
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": "Room not found"
-                    })
-                    continue
+                    print(f"Room {room_code} not found, auto-creating...")
+                    games[room_code] = Game()
+                    # await websocket.send_json({
+                    #     "type": "error",
+                    #     "message": "Room not found"
+                    # })
+                    # continue
 
                 manager.active_connections[websocket]["username"] = username
                 manager.active_connections[websocket]["room_code"] = room_code
@@ -213,12 +216,15 @@ async def websocket_endpoint(websocket: WebSocket):
                 # Broadcast video frame to all OTHERS (not back to sender ideally, but broadcast is fine too)
                 # To save bandwidth, we could exclude sender.
                 username = manager.active_connections[websocket]["username"]
+                room_code = manager.active_connections[websocket]["room_code"]
                 frame_data = data.get("frame")
-                await manager.broadcast({
-                    "type": "video_update",
-                    "username": username,
-                    "frame": frame_data
-                })
+                
+                if room_code:
+                    await manager.broadcast_to_room(room_code, {
+                        "type": "video_update",
+                        "username": username,
+                        "frame": frame_data
+                    })
 
     except WebSocketDisconnect:
         room_code = manager.disconnect(websocket)
