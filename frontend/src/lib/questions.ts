@@ -3,31 +3,31 @@ import { Question } from "@/types";
 export const QUESTIONS: Question[] = [
   {
     id: "q1",
-    text: "Tell me about a time you failed.",
+    prompt: "Tell me about a time you failed.",
     type: "BEHAVIOURAL",
     duration: 60,
   },
   {
     id: "q2",
-    text: "Describe a conflict you had with a coworker and how you resolved it.",
+    prompt: "Describe a conflict you had with a coworker and how you resolved it.",
     type: "BEHAVIOURAL",
     duration: 60,
   },
   {
     id: "q3",
-    text: "What is your greatest weakness?",
+    prompt: "What is your greatest weakness?",
     type: "BEHAVIOURAL",
     duration: 60,
   },
   {
     id: "q4",
-    text: "Why do you want to work here?",
+    prompt: "Why do you want to work here?",
     type: "BEHAVIOURAL",
     duration: 60,
   },
   {
     id: "q5",
-    text: "Tell me about a challenging project you worked on.",
+    prompt: "Tell me about a challenging project you worked on.",
     type: "BEHAVIOURAL",
     duration: 60,
   },

@@ -1,16 +1,15 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { AvatarStickFigure } from "@/components/AvatarStickFigure";
 import { getMediaStream } from "@/lib/media";
-import { FakeServer } from "@/lib/fakeServer";
-import { Loader2, Mic, Video, VideoOff, MicOff } from "lucide-react";
+import { Loader2, Mic, Video, VideoOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-export default function PreflightPage() {
+function PreflightContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const code = searchParams.get("code");
@@ -42,7 +41,6 @@ export default function PreflightPage() {
           console.error(err);
           setError("Could not access camera/microphone. Please allow permissions.");
           setCameraEnabled(false);
-          // Try audio only? Or just fail gracefully
         }
       }
     }
@@ -51,12 +49,9 @@ export default function PreflightPage() {
 
     return () => {
       mounted = false;
-      // Don't stop tracks here if we want to pass them? 
-      // Actually we restart stream in lobby or pass it? 
-      // For MVP it's easier to verify here, then let Lobby acquire it again or context.
-      // Ideally we'd have a MediaContext. But for now let's stop it to be safe.
-      // Wait, if we stop it, the user sees flash.
-      // Let's stop it here and re-acquire in Lobby/Game.
+      // Stop local stream here to avoid flash, re-acquire in Lobby
+      // stream?.getTracks().forEach(t => t.stop()); 
+      // Actually correct behavior: allow clean unmount
     };
   }, []);
 
@@ -77,9 +72,6 @@ export default function PreflightPage() {
     // Stop local stream before navigating
     stream?.getTracks().forEach(t => t.stop());
     
-    // We navigate first, then Lobby connects and joins.
-    // Or we can connect here. But typically Lobby is where the socket connection is persistent.
-    // Let's rely on Lobby to do the join as per our plan.
     router.push(`/room/${code}`);
   };
 
@@ -128,5 +120,13 @@ export default function PreflightPage() {
         </CardContent>
       </Card>
     </main>
+  );
+}
+
+export default function PreflightPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><Loader2 className="animate-spin w-8 h-8" /></div>}>
+      <PreflightContent />
+    </Suspense>
   );
 }
