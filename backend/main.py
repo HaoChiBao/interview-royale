@@ -142,6 +142,17 @@ async def websocket_endpoint(websocket: WebSocket):
                         "state": "RESULTS"
                     })
 
+            elif message_type == "video_update":
+                # Broadcast video frame to all OTHERS (not back to sender ideally, but broadcast is fine too)
+                # To save bandwidth, we could exclude sender.
+                username = manager.active_connections[websocket]["username"]
+                frame_data = data.get("frame")
+                await manager.broadcast({
+                    "type": "video_update",
+                    "username": username,
+                    "frame": frame_data
+                })
+
     except WebSocketDisconnect:
         manager.disconnect(websocket)
         await manager.broadcast_player_list()
