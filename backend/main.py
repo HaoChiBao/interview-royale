@@ -113,7 +113,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 submission_content = data.get("content")
                 
                 # Grade immediately (mock async)
-                result = await grade_submission(submission_content)
+                result = await grade_submission(submission_content, game_enigne.current_question)
                 
                 # Store result
                 game_enigne.submissions[username] = {
