@@ -3,14 +3,27 @@ import { useGameStore } from "@/store/useGameStore";
 // Singleton WebSocket client
 class GameSocket {
   private socket: WebSocket | null = null;
-  private getWebSocketUrl(): string {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    const wsProtocol = apiUrl.startsWith("https") ? "wss" : "ws";
-    const wsUrl = apiUrl.replace(/^https?/, wsProtocol);
-    return wsUrl + "/ws";
-  }
 
-  private url: string = this.getWebSocketUrl();
+//   private getWebSocketUrl(): string {
+//     console.log("[Socket] Env Check:", {
+//       WS: process.env.NEXT_PUBLIC_WS_URL,
+//       API: process.env.NEXT_PUBLIC_API_URL
+//     });
+
+//     if (process.env.NEXT_PUBLIC_WS_URL) {
+//       // Ensure it ends with /ws if not present
+//       const url = process.env.NEXT_PUBLIC_WS_URL;
+//       return url.endsWith("/ws") ? url : url + "/ws";
+//     }
+    
+//     // Fallback: derive from API URL
+//     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+//     const wsProtocol = apiUrl.startsWith("https") ? "wss" : "ws";
+//     const wsUrl = apiUrl.replace(/^https?/, wsProtocol);
+//     return wsUrl + "/ws";
+//   }
+
+  private url: string = 'wss://interview-royale-production.up.railway.app/ws';
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private messageQueue: string[] = [];
 
