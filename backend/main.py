@@ -46,37 +46,55 @@ class Game:
         )
         return sorted_results
 
-game_enigne = Game()
+# Global dictionary to store game instances keyed by room_code
+# { "ABCD": Game() }
+games: Dict[str, Game] = {}
 
 class ConnectionManager:
     def __init__(self):
-        # Key: WebSocket, Value: dict (player info)
+        # Key: WebSocket, Value: dict (player info: username, room_code)
         self.active_connections: Dict[WebSocket, dict] = {}
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
-        self.active_connections[websocket] = {"username": None}
+        # Initial connection doesn't have metadata yet
+        self.active_connections[websocket] = {"username": None, "room_code": None}
         print(f"Client connected. Total: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
-            username = self.active_connections[websocket].get("username")
+            data = self.active_connections[websocket]
+            username = data.get("username")
+            room_code = data.get("room_code")
             del self.active_connections[websocket]
-            print(f"Client {username} disconnected. Total: {len(self.active_connections)}")
+            print(f"Client {username} disconnected from room {room_code}. Total: {len(self.active_connections)}")
+            return room_code
 
-    async def broadcast(self, message: dict):
-        for connection in self.active_connections:
-            try:
-                await connection.send_json(message)
-            except:
-                pass # Handle disconnected clients gracefully
+    async def broadcast_to_room(self, room_code: str, message: dict):
+        if not room_code: return
+        
+        for connection, data in self.active_connections.items():
+            if data.get("room_code") == room_code:
+                try:
+                    await connection.send_json(message)
+                except:
+                    pass
 
-    async def broadcast_player_list(self):
-        players_list = [{"username": data["username"]} for _, data in self.active_connections.items() if data["username"]]
-        await self.broadcast({
+    async def broadcast_player_list(self, room_code: str):
+        if not room_code: return
+
+        players_list = []
+        for _, data in self.active_connections.items():
+            if data.get("room_code") == room_code and data.get("username"):
+                players_list.append({"username": data["username"]})
+        
+        game_instance = games.get(room_code)
+        current_state = game_instance.state if game_instance else "LOBBY"
+
+        await self.broadcast_to_room(room_code, {
             "type": "player_update",
             "players": players_list,
-            "game_state": game_enigne.state
+            "game_state": current_state
         })
 
 manager = ConnectionManager()
@@ -84,6 +102,12 @@ manager = ConnectionManager()
 @app.get("/")
 async def get():
     return {"message": "Interview Royale Backend Running"}
+
+import string
+import random
+
+def generate_room_code(length=6):
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -94,29 +118,71 @@ async def websocket_endpoint(websocket: WebSocket):
             message_type = data.get("type")
             print(f"Received: {data}")
 
-            if message_type == "join":
+            if message_type == "create_room":
                 username = data.get("username")
+                room_code = generate_room_code()
+                
+                # Ensure uniqueness
+                while room_code in games:
+                    room_code = generate_room_code()
+                
+                games[room_code] = Game()
+                print(f"Created new room: {room_code}")
+                
                 manager.active_connections[websocket]["username"] = username
-                await manager.broadcast_player_list()
+                manager.active_connections[websocket]["room_code"] = room_code
+                
+                # Notify creator (they need the room code to share)
+                await websocket.send_json({
+                    "type": "room_created",
+                    "room_code": room_code
+                })
+                
+                await manager.broadcast_player_list(room_code)
+
+            elif message_type == "join":
+                username = data.get("username")
+                room_code = data.get("room_code", "").upper()
+                
+                if room_code not in games:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Room not found"
+                    })
+                    continue
+
+                manager.active_connections[websocket]["username"] = username
+                manager.active_connections[websocket]["room_code"] = room_code
+                
+                print(f"Player {username} joined room {room_code}")
+                await manager.broadcast_player_list(room_code)
 
             elif message_type == "start_game":
-                # Ideally, check if user is host. For now, anyone can start.
-                question = game_enigne.start_round()
-                await manager.broadcast({
+                room_code = manager.active_connections[websocket]["room_code"]
+                if not room_code or room_code not in games: continue
+                
+                game = games[room_code]
+                question = game.start_round()
+                
+                await manager.broadcast_to_room(room_code, {
                     "type": "new_question",
                     "question": question,
                     "state": "QUESTION"
                 })
 
             elif message_type == "submit":
+                room_code = manager.active_connections[websocket]["room_code"]
+                if not room_code or room_code not in games: continue
+                
+                game = games[room_code]
                 username = manager.active_connections[websocket]["username"]
                 submission_content = data.get("content")
                 
-                # Grade immediately (mock async)
-                result = await grade_submission(submission_content, game_enigne.current_question)
+                # Grade immediately
+                result = await grade_submission(submission_content, game.current_question)
                 
                 # Store result
-                game_enigne.submissions[username] = {
+                game.submissions[username] = {
                     "content": submission_content,
                     "score": result["score"],
                     "feedback": result["feedback"]
@@ -128,25 +194,29 @@ async def websocket_endpoint(websocket: WebSocket):
                     "result": result
                 })
                 
-                # Check if everyone has submitted (simplification: just wait or manual end?)
-                # For this MVP, let's treat every submission as an update to the lobby
-                # Or create a "results" view if all active players submitted
+                # Check for round end
+                # Count active players IN THIS ROOM
+                room_players_count = len([
+                    p for p in manager.active_connections.values() 
+                    if p.get("room_code") == room_code and p.get("username")
+                ])
                 
-                active_players_count = len([p for p in manager.active_connections.values() if p["username"]])
-                if len(game_enigne.submissions) >= active_players_count:
-                    # Everyone submitted! Show results
-                    results = game_enigne.end_round()
-                    await manager.broadcast({
+                if len(game.submissions) >= room_players_count:
+                    results = game.end_round()
+                    await manager.broadcast_to_room(room_code, {
                         "type": "round_over",
                         "results": results,
                         "state": "RESULTS"
                     })
 
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        await manager.broadcast_player_list()
+        room_code = manager.disconnect(websocket)
+        if room_code:
+            await manager.broadcast_player_list(room_code)
+            # Optional: Delete room if empty
+            # active_in_room = [p for p in manager.active_connections.values() if p["room_code"] == room_code]
+            # if not active_in_room and room_code in games:
+            #     del games[room_code]
     except Exception as e:
         print(f"Error: {e}")
-        # import traceback
-        # traceback.print_exc()
         manager.disconnect(websocket)

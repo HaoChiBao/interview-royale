@@ -1,8 +1,7 @@
 import os
-import json
 from openai import OpenAI
 import dotenv
-import asyncio
+import random
 
 dotenv.load_dotenv()
 
@@ -88,10 +87,3 @@ async def grade_submission(submission_data, question):
             "score": 0,
             "feedback": "Error during AI grading. Please check server logs."
         }
-
-
-mock_question = {
-    "type": "behavioral",
-    "prompt": "Tell me about yourself"
-}
-print(asyncio.run(grade_submission("my name is kevin and i worked at rbc and have 5 years of software engineering experience, i built an app with 1000 users", mock_question)))
