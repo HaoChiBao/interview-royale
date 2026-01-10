@@ -1,0 +1,105 @@
+import { useGameStore } from "@/store/useGameStore";
+
+// Singleton WebSocket client
+class GameSocket {
+  private socket: WebSocket | null = null;
+  private getWebSocketUrl(): string {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const wsProtocol = apiUrl.startsWith("https") ? "wss" : "ws";
+    const wsUrl = apiUrl.replace(/^https?/, wsProtocol);
+    return wsUrl + "/ws";
+  }
+
+  private url: string = this.getWebSocketUrl();
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private messageQueue: string[] = [];
+
+  connect() {
+    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    console.log("Connecting to WS...", this.url);
+    this.socket = new WebSocket(this.url);
+
+    this.socket.onopen = () => {
+      console.log("WS Connected");
+      if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+      this.flushQueue();
+    };
+
+    this.socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const { debugLogState, handleServerMessage } = useGameStore.getState();
+        
+        if (debugLogState) {
+          console.log("[WS IN]", data);
+        }
+        
+        handleServerMessage(data);
+      } catch (e) {
+        console.error("WS Parse Error", e);
+      }
+    };
+
+    this.socket.onclose = () => {
+      console.log("WS Closed");
+      this.socket = null;
+      // Auto reconnect
+      this.reconnectTimeout = setTimeout(() => this.connect(), 2000);
+    };
+
+    this.socket.onerror = (err) => {
+      console.error("WS Error", err);
+      // onError will usually be followed by onClose
+    };
+  }
+
+  private flushQueue() {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    while (this.messageQueue.length > 0) {
+      const msg = this.messageQueue.shift();
+      if (msg) this.socket.send(msg);
+    }
+  }
+
+  send(type: string, payload: any) {
+    const msg = { type, ...payload };
+    const { debugLogState } = useGameStore.getState();
+    if (debugLogState) {
+      console.log("[WS OUT]", msg);
+    }
+    
+    const msgStr = JSON.stringify(msg);
+
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(msgStr);
+    } else {
+      console.log("WS Not Connected, queuing", type);
+      this.messageQueue.push(msgStr);
+    }
+  }
+
+  join(username: string) {
+    const { roomCode } = useGameStore.getState();
+    this.send("join", { username, room_code: roomCode });
+  }
+
+  startGame() {
+    this.send("start_game", {});
+  }
+
+  submit(content: string) {
+    this.send("submit", { content });
+  }
+
+  sendVideoFrame(frame: string) {
+      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+          // Bypass debug log for video frames to avoid spam
+          this.socket.send(JSON.stringify({ type: "video_update", frame }));
+      }
+  }
+}
+
+export const socketClient = new GameSocket();
