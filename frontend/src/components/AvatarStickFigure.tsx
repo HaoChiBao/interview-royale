@@ -156,7 +156,11 @@ export function AvatarStickFigure({
 
       {/* Name Label */}
       {!hideNameTag && (
-        <div className="mt-1 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded-full flex gap-1 items-center z-20 whitespace-nowrap">
+        <div className="mt-1 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded-full flex gap-1 items-center z-20 whitespace-nowrap"
+        style={{ 
+            fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+            letterSpacing: "-0.5px"
+        }}>
           {name} {isMe ? "(You)" : ""}
         </div>
       )}

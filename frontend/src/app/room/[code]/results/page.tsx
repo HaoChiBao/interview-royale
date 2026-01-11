@@ -68,7 +68,7 @@ export default function ResultsPage() {
         <main 
             className="min-h-screen flex flex-col items-center justify-center p-8 bg-white text-zinc-900 font-sans overflow-hidden"
             style={{ 
-              fontFamily: "SF Pro, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+              fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
               letterSpacing: "-0.5px"
             }}
         >
@@ -81,22 +81,32 @@ export default function ResultsPage() {
             </div>
 
             {/* 2. My Score (Moved WAY up to avoid overlap) */}
-            <h2 className="text-3xl font-bold mb-40 relative z-40">
+            <h2 className="text-3xl font-bold mb-25 relative z-40"
+                style={{
+                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                    letterSpacing: "-0.5px"
+                }}
+            >
                 Your Score: <span className="text-blue-500">{myScore}pts</span>
             </h2>
 
             {/* 3. Main Content: Podium + List */}
-            <div className="flex flex-col md:flex-row items-end justify-center gap-16 mb-16 w-full max-w-6xl px-4">
+            <div className="flex flex-col md:flex-row items-end justify-center gap-3 mb-16 w-full max-w-6xl px-4">
                 
                 {/* Podium Container - Compact height */}
-                <div className="relative flex items-end justify-center h-[260px] w-full max-w-3xl">
+                <div className="relative flex items-end justify-center h-[300px] w-full max-w-2xl">
                     
                     {/* #2 (Left, Tilted -6deg) */}
                     {top3[1] && (
-                        <div className="absolute left-0 bottom-4 z-20 transform -rotate-6 transition-transform hover:rotate-0 duration-300 origin-bottom-right">
-                             <div className="bg-white px-2 pt-2 pb-3 rounded-sm shadow-xl border-[6px] border-zinc-200 w-[160px] md:w-[200px] flex flex-col items-center rotate-[-2deg]">
+                        <div className="absolute left-0 bottom-4 z-20 transform -rotate-8 transition-transform hover:rotate-0 duration-300 origin-bottom-right">
+                             <div className="bg-white px-2 pt-2 pb-3 rounded-sm shadow-xl border-2 border-[#C0C0C0] w-[200px] md:w-[250px] flex flex-col items-center"
+                             style={{
+                                boxShadow: "0px 3.35px 10.19px 5.05px #C0C0C0"
+                                    
+
+ }}>
                                 {/* Avatar Container - Allow overflow for head */}
-                                <div className="bg-zinc-200 w-full aspect-[16/10] rounded-sm mb-3 flex items-end justify-center relative">
+                                <div className="bg-[#E5E7EB] w-full aspect-[16/10] rounded-sm mb-3 flex items-end justify-center relative">
                                      <div className="absolute -bottom-6 transform scale-110">
                                         <AvatarStickFigure 
                                             name=""
@@ -108,10 +118,15 @@ export default function ResultsPage() {
                                         />
                                      </div>
                                 </div>
-                                <div className="text-center w-full px-1">
-                                    <div className="text-5xl font-black text-zinc-300 leading-none mb-0.5">#2</div>
-                                    <div className="text-lg font-bold text-zinc-800 leading-tight truncate w-full">{top3[1].username}</div>
-                                    <div className="text-base font-bold text-zinc-400">{top3[1].score}pts</div>
+                                <div className="text-center w-full px-1"
+                                style={{
+                                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                                    letterSpacing: "-0.5px"
+                                }}>
+                                    <div className="text-5xl font-bold text-[#C9C9C9] leading-none mb-0.5">#2</div>
+                                    <div className="text-lg font-semibold text-zinc-700 leading-tight truncate w-full">
+                                        {top3[1].username}: {top3[1].score}pts
+                                    </div>
                                 </div>
                              </div>
                         </div>
@@ -120,8 +135,13 @@ export default function ResultsPage() {
                     {/* #3 (Right, Tilted +6deg) */}
                     {top3[2] && (
                         <div className="absolute right-0 bottom-4 z-10 transform rotate-6 transition-transform hover:rotate-0 duration-300 origin-bottom-left">
-                             <div className="bg-white px-2 pt-2 pb-3 rounded-sm shadow-xl border-[6px] border-orange-200 w-[160px] md:w-[200px] flex flex-col items-center rotate-[2deg]">
-                                <div className="bg-orange-200 w-full aspect-[16/10] rounded-sm mb-3 flex items-end justify-center relative">
+                             <div className="bg-white px-2 pt-2 pb-3 rounded-sm
+ border-2 border-[#E1925D] w-[200px] md:w-[250px] flex flex-col items-center"
+ style={{
+    boxShadow: "0px 3.35px 10.19px 5.05px #BD520A"
+
+ }}>
+                                <div className="bg-[#E1925D] w-full aspect-[16/10] rounded-sm mb-3 flex items-end justify-center relative">
                                     <div className="absolute -bottom-6 transform scale-110">
                                         <AvatarStickFigure 
                                             name=""
@@ -133,10 +153,15 @@ export default function ResultsPage() {
                                         />
                                     </div>
                                 </div>
-                                <div className="text-center w-full px-1">
-                                    <div className="text-5xl font-black text-orange-300 leading-none mb-0.5">#3</div>
-                                    <div className="text-lg font-bold text-zinc-800 leading-tight truncate w-full">{top3[2].username}</div>
-                                    <div className="text-base font-bold text-orange-400">{top3[2].score}pts</div>
+                                <div className="text-center w-full px-1"
+                                style={{
+                                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                                    letterSpacing: "-0.5px"
+                                }}>
+                                    <div className="text-5xl font-bold text-[#BD520A] leading-none mb-0.5">#3</div>
+                                    <div className="text-lg font-bold text-zinc-700 leading-tight truncate w-full">
+                                        {top3[2].username}: {top3[2].score}pts
+                                    </div>
                                 </div>
                              </div>
                         </div>
@@ -144,10 +169,13 @@ export default function ResultsPage() {
 
                     {/* #1 (Center, Straight, Scale 1.1) */}
                     {top3[0] && (
-                        <div className="absolute bottom-6 z-30 transform scale-100 transition-transform hover:scale-105 duration-300">
-                             <div className="bg-white px-3 pt-3 pb-5 rounded-sm shadow-2xl border-[6px] border-yellow-300 w-[200px] md:w-[240px] flex flex-col items-center">
-                                <div className="bg-yellow-100 w-full aspect-[16/10] rounded-sm mb-4 flex items-end justify-center relative">
-                                     <div className="absolute -bottom-8 transform scale-125">
+                        <div className="absolute bottom-6 z-30 transform scale-110 transition-transform hover:scale-105 duration-300">
+                             <div className="bg-white px-3 pt-3 pb-5 rounded-sm shadow-2xl border-2 border-[#F5C518] w-[200px] md:w-[250px] flex flex-col items-center"
+                             style={{
+                                boxShadow: "0px 3.35px 10.19px 5.05px #D8A728"
+                             }}>
+                                <div className="bg-[#FDE4A1] w-full aspect-[16/10] rounded-sm mb-4 flex items-end justify-center relative">
+                                     <div className="absolute -bottom-4 transform scale-125">
                                          <AvatarStickFigure 
                                             name=""
                                             isMe={top3[0].isMe}
@@ -158,10 +186,15 @@ export default function ResultsPage() {
                                         />
                                      </div>
                                 </div>
-                                <div className="text-center w-full px-1">
-                                    <div className="text-7xl font-black text-yellow-400 leading-none mb-0.5">#1</div>
-                                    <div className="text-xl font-bold text-zinc-800 leading-tight truncate w-full">{top3[0].username}</div>
-                                    <div className="text-lg font-bold text-yellow-500">{top3[0].score}pts</div>
+                                <div className="text-center w-full px-1" 
+                                style={{
+                                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                                    letterSpacing: "-0.5px"
+                                }}>
+                                    <div className="text-6xl font-bold text-[#D8A728] leading-none mb-0.5">#1</div>
+                                    <div className="text-xl font-bold text-zinc-800 leading-tight truncate w-full">
+                                        {top3[0].username} {top3[0].isMe ? "(You)" : ""}: {top3[0].score}pts
+                                    </div>
                                 </div>
                              </div>
                         </div>

@@ -94,24 +94,33 @@ function PreflightContent() {
           <Image src={titleImage} alt="Interview Royale" width={300} height={80} className="w-auto h-16 object-contain opacity-90" />
       </div>
 
-      <Card className="w-full max-w-sm shadow-xl shadow-zinc-200/50 border-0 overflow-visible bg-white">
+      <Card className="w-full max-w-md shadow-xl shadow-blue-100/50 border-2 border-blue-100 overflow-visible bg-white">
         <CardContent className="pt-12 pb-8 px-8 flex flex-col items-center gap-6">
-          <h1 className="text-xl font-bold tracking-tight text-zinc-800">Setup Your Avatar</h1>
+          <h1 className="text-5xl font-bold tracking-tight text-[#4294DD]" style={{ 
+                                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                                    letterSpacing: "-.50px", lineHeight: "1.00"
+                                }}>Setup Your Avatar</h1>
           
-          {/* Avatar Container - Increased margin to prevent overlap due to scaling */}
-          <div className="relative flex justify-center items-center w-full h-[220px] bg-zinc-100/50 rounded-2xl mb-6 border border-zinc-100">
-            <div className="transform scale-110 origin-center ">
+          {/* Avatar Container */}
+          <div className="relative flex justify-center items-center w-full h-[220px] bg-zinc-100/50 rounded-2xl border border-zinc-100">
+            <div className="transform scale-120 origin-center">
                 <AvatarStickFigure
                   name={name}
                   isMe={true}
-                  stream={stream}
+                  stream={stream} 
+                  hideNameTag={true}
                   cameraEnabled={cameraEnabled}
                 />
             </div>
             
             {/* Name Badge */}
-            <div className="absolute top-3 right-3 bg-white/90 text-zinc-800 text-xs px-2.5 py-1 rounded-md font-medium shadow-sm border border-zinc-200/50 backdrop-blur-sm">
-                {name} <span className="text-zinc-400 font-normal ml-1">(You)</span>
+            <div className="absolute top-3 right-3 bg-white/90 text-zinc-800 text-xs px-2.5 py-1 rounded-md font-medium shadow-sm border border-zinc-200/50 backdrop-blur-sm"
+            style={{
+                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                    letterSpacing: "-.50px", lineHeight: "1.00"
+                }}>
+                {name} <span className="text-zinc-400 ml-1"
+                >(You)</span>
             </div>
           </div>
 
@@ -142,13 +151,22 @@ function PreflightContent() {
                 </div>
               )}
               
-              <div className="text-xs text-zinc-400 font-medium mt-1">
-                 Room Code: <span className="font-mono text-zinc-600">{code}</span>
+              <div className="text-sm text-zinc-400 font-medium font-inter mt-1"
+                style={{ 
+                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                    letterSpacing: "-.50px", lineHeight: "1.00"
+                }}
+              >
+                 Room Code: <span className="font-inter text-zinc-600">{code}</span>
               </div>
 
               <Button 
-                className="w-full text-white font-bold h-11 rounded-xl shadow-lg shadow-blue-500/20 mt-2 hover:brightness-110 transition-all active:scale-[0.98]" 
-                style={{ backgroundColor: '#4294DD' }}
+                className="w-full text-xl font-bold h-12 rounded-lg shadow-lg shadow-blue-400/10 mt-2 transition-all active:scale-[0.98] border-2 border-[#4294DD] bg-white text-[#4294DD] hover:bg-[#4294DD] hover:text-white" 
+                style={{ 
+                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif", 
+                    letterSpacing: "-.50px", 
+                    lineHeight: "1.00" 
+                }}
                 onClick={handleEnter}
               >
                 Enter Lobby

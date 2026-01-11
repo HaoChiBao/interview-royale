@@ -43,7 +43,7 @@ export function LeaderboardOverlay() {
         <div 
             className="fixed top-4 right-4 z-[60] w-72 animate-in slide-in-from-right-10 fade-in duration-500 font-sans"
             style={{ 
-              fontFamily: "SF Pro, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+              fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
               letterSpacing: "-0.5px"
             }}
         >
@@ -57,7 +57,11 @@ export function LeaderboardOverlay() {
 
                 <CardContent className="p-0 max-h-[320px] overflow-y-auto">
                     {displayData.length === 0 ? (
-                        <div className="p-6 text-center text-zinc-400 text-sm font-medium">
+                        <div className="p-6 text-center text-zinc-400 text-sm font-medium"
+                        style={{ 
+                            fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                            letterSpacing: "-0.5px"
+                        }}>
                             Waiting for players...
                         </div>
                     ) : (

@@ -138,7 +138,12 @@ export default function LobbyPage() {
       {/* Animation Overlay */}
       {isChoosingSettings && (
         <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center text-white backdrop-blur-sm animate-in fade-in duration-300">
-          <h2 className="text-3xl font-bold mb-8 animate-pulse text-indigo-400">Choosing Settings...</h2>
+          <h2 className="text-3xl font-bold mb-8 animate-pulse text-indigo-400"
+            style={{ 
+                fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                letterSpacing: "-.50px", lineHeight: "1.00"
+            }}
+          >Choosing Settings...</h2>
           <div className="bg-white text-black text-9xl font-black p-12 rounded-3xl shadow-2xl min-w-[300px] text-center">
             {spinResult}
           </div>
@@ -155,7 +160,12 @@ export default function LobbyPage() {
       <header className="fixed top-0 left-0 right-0 z-10 flex justify-between items-center p-8 pointer-events-none">
         
         {/* Room Code Pill */}
-        <div className="pointer-events-auto bg-white/90 backdrop-blur-md px-5 py-3 rounded-2xl border border-zinc-200 shadow-sm flex items-center gap-4">
+        <div className="pointer-events-auto bg-white/90 backdrop-blur-md px-5 py-3 rounded-2xl border border-zinc-200 shadow-sm flex items-center gap-4"
+          style={{ 
+              fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+              letterSpacing: "-.50px", lineHeight: "1.00"
+          }}
+        >
           <div>
               <div className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Room Code</div>
               <div className="flex items-center gap-2 text-zinc-800 hover:text-indigo-600 cursor-pointer transition-colors" onClick={copyCode}>
@@ -166,8 +176,18 @@ export default function LobbyPage() {
         </div>
 
         {/* Player Count Pill */}
-        <div className="pointer-events-auto">
-           <Badge variant="outline" className="text-base px-4 py-2 bg-white/90 backdrop-blur-md border-zinc-200 text-zinc-700 shadow-sm">
+        <div className="pointer-events-auto"
+          style={{ 
+              fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+              letterSpacing: "-.50px", lineHeight: "1.00"
+          }}
+        >
+           <Badge variant="outline" className="text-base px-4 py-2 bg-white/90 backdrop-blur-md border-zinc-200 text-zinc-700 shadow-sm"
+          style={{ 
+              fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+              letterSpacing: "-.50px", lineHeight: "1.00"
+          }}
+           >
              {others.length + 1} Players
            </Badge>
         </div>
@@ -181,9 +201,19 @@ export default function LobbyPage() {
            
            {/* Game Settings Card - Floating */}
             <div className="bg-white/90 border border-zinc-200/50 p-6 rounded-2xl flex-1 w-full shadow-xl backdrop-blur-md">
-                <h3 className="font-bold text-xs uppercase text-zinc-400 mb-3 tracking-wider">Game Settings</h3>
+                <h3 className="font-bold text-xs uppercase text-zinc-400 mb-3 tracking-wider"
+                style={{ 
+                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                    letterSpacing: "-.50px", lineHeight: "1.00"
+                }}
+                >Game Settings</h3>
                 <div className="flex items-center justify-between">
-                    <span className="font-medium text-zinc-700">Number of Rounds</span>
+                    <span className="font-medium text-zinc-700"
+                    style={{ 
+                        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                        letterSpacing: "-.50px", lineHeight: "1.00"
+                    }}
+                    >Number of Rounds</span>
                     <div className="flex items-center gap-3">
                         {me?.isLeader ? (
                              <>
@@ -192,7 +222,12 @@ export default function LobbyPage() {
                                 onClick={() => updateSettings({ num_rounds: gameSettings.num_rounds - 1 })}
                                 disabled={isChoosingSettings || useGameStore.getState().isStarting}
                                 > - </Button>
-                                <span className="w-8 text-center font-bold text-xl text-zinc-800">{gameSettings.num_rounds}</span>
+                                <span className="w-8 text-center font-bold text-xl text-zinc-800"
+                                style={{ 
+                                    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                                    letterSpacing: "-.50px", lineHeight: "1.00"
+                                }}
+                                >{gameSettings.num_rounds}</span>
                                 <Button 
                                 variant="outline" size="icon" className="h-8 w-8 rounded-full border-zinc-300"
                                 onClick={() => updateSettings({ num_rounds: gameSettings.num_rounds + 1 })}
@@ -200,9 +235,14 @@ export default function LobbyPage() {
                                 > + </Button>
                              </>
                         ) : (
-                             <span className="w-8 text-center font-bold text-xl text-zinc-400">{gameSettings.num_rounds}</span>
+                             <span className="w-8 text-center font-bold text-xl text-zinc-400"
+                             style={{ 
+                                 fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                                 letterSpacing: "-.50px", lineHeight: "1.00"
+                             }}
+                             >{gameSettings.num_rounds}</span>
                         )}
-                    </div>
+                    </div>    
                 </div>
                 {!me?.isLeader && (
                     <p className="text-[10px] text-zinc-400 mt-2 text-center uppercase tracking-wide">
@@ -217,6 +257,10 @@ export default function LobbyPage() {
                      <Button 
                         size="lg" 
                         className="w-full font-bold text-lg h-16 shadow-xl shadow-indigo-500/30 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] bg-indigo-600 hover:bg-indigo-700 text-white border-2 border-indigo-500/50"
+                        style={{ 
+                            fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                            letterSpacing: "-.50px", lineHeight: "1.00"
+                        }}
                         onClick={handleStart}
                         disabled={isChoosingSettings || useGameStore.getState().isStarting} 
                     >
@@ -224,15 +268,25 @@ export default function LobbyPage() {
                         {useGameStore.getState().isStarting ? "Starting..." : "Start Game"}
                     </Button>
                  ) : (
-                     <div className="text-center p-4 bg-white/80 backdrop-blur rounded-xl text-zinc-500 font-medium border border-white/40 shadow-lg w-full">
+                     <div className="text-center p-4 bg-white/80 backdrop-blur rounded-xl text-zinc-500 font-medium border border-white/40 shadow-lg w-full"
+                     style={{ 
+                         fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                         letterSpacing: "-.50px", lineHeight: "1.00"
+                     }}
+                     >
                         Waiting for leader...
                      </div>
                  )}
             </div>
             {!me?.isLeader && (
-              <p className="text-xs text-zinc-400 mt-4 text-center">
+              <p className="text-xs text-zinc-400 mt-4 text-center"
+              style={{ 
+                  fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                  letterSpacing: "-.50px", lineHeight: "1.00"
+              }}
+              >
                 Only the leader can change settings.
-              </p>
+              </p>  
             )}
           </div>
 
@@ -254,10 +308,20 @@ function CountdownOverlay() {
 
   return (
     <div className="absolute inset-0 z-[60] bg-black/90 flex flex-col items-center justify-center text-white backdrop-blur-md animate-in fade-in duration-300">
-      <div className="text-[200px] font-black animate-pulse leading-none bg-gradient-to-b from-indigo-400 to-purple-600 bg-clip-text text-transparent">
+      <div className="text-[200px] font-black animate-pulse leading-none bg-gradient-to-b from-indigo-400 to-purple-600 bg-clip-text text-transparent"
+        style={{ 
+          fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+          letterSpacing: "-.50px", lineHeight: "1.00"
+      }}
+      >
         {count}
       </div>
-      <h2 className="text-3xl font-bold mt-8 text-zinc-300 animate-bounce">
+      <h2 className="text-3xl font-bold mt-8 text-zinc-300 animate-bounce"
+      style={{ 
+          fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+          letterSpacing: "-.50px", lineHeight: "1.00"
+      }}
+      >
         Prepare for the interview...
       </h2>
     </div>

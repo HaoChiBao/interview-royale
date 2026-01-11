@@ -18,7 +18,11 @@ export function CoffeeChatModal({ partnerName, partnerFrame, localStream, onLeav
     }, [localStream]);
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-8 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-8 backdrop-blur-sm animate-in fade-in duration-300"
+        style={{ 
+            fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+            letterSpacing: "-0.5px"
+        }}>
             {/* Header */}
             <div className="absolute top-6 left-8 text-white">
                 <h2 className="text-2xl font-bold flex items-center gap-2">

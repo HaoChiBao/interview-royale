@@ -223,7 +223,11 @@ export function IntermissionCanvas({ localStream, className }: IntermissionCanva
             {/* LEADER BADGE (Top Center) */}
             {me?.isLeader && (
                 <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black/80 text-white px-4 py-1.5 rounded-full shadow-sm text-xs font-medium backdrop-blur-md z-50 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse" />
+                    <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse"
+                    style={{ 
+                        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                        letterSpacing: "-.50px", lineHeight: "1.00"
+                    }} />
                     You are the leader
                 </div>
             )}
@@ -232,12 +236,22 @@ export function IntermissionCanvas({ localStream, className }: IntermissionCanva
             {/* HIDE IN LOBBY AND ROUND */}
             {phase !== "LOBBY" && phase !== "ROUND" && (
                 <div className="absolute bottom-12 left-1/2 -translate-x-1/2 bg-white/95 px-6 py-4 rounded-2xl shadow-2xl shadow-black/5 border border-zinc-100 z-50 flex flex-col items-center gap-1.5 backdrop-blur-sm min-w-[240px]">
-                    <h2 className="text-lg font-bold text-zinc-900 tracking-tight">
+                    <h2 className="text-lg font-bold text-zinc-900 tracking-tight"
+                    style={{ 
+                        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                        letterSpacing: "-.50px", lineHeight: "1.00"
+                    }}
+                    >   
                         Intermission
                     </h2>
                     
-                    <div className="flex items-center gap-2 text-zinc-500 text-sm font-medium">
-                        {timeLeft > 0 ? (
+                    <div className="flex items-center gap-2 text-zinc-500 text-sm font-medium"
+                    style={{ 
+                        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                        letterSpacing: "-.50px", lineHeight: "1.00"
+                    }}
+                    >
+                        {timeLeft > 0 ? (   
                             <>
                                 <span>Next round in</span>
                                 <span className="font-mono text-zinc-900 font-bold bg-zinc-100 px-1.5 py-0.5 rounded text-xs">
@@ -254,6 +268,10 @@ export function IntermissionCanvas({ localStream, className }: IntermissionCanva
                         <button
                             onClick={() => socketClient.send("skip_intermission", {})}
                             className="mt-2 bg-white hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 text-xs font-semibold px-4 py-1.5 rounded-full border border-zinc-200 shadow-sm transition-all hover:border-zinc-300 active:scale-95 flex items-center gap-1.5 group"
+                            style={{ 
+                                fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                                letterSpacing: "-.50px", lineHeight: "1.00"
+                            }}
                         >
                             Skip Wait
                             <svg className="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -424,12 +442,20 @@ export function IntermissionCanvas({ localStream, className }: IntermissionCanva
                                 setInviteTarget(null);
                             }}
                             className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all hover:scale-105 active:scale-95"
+                            style={{ 
+                                fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                                letterSpacing: "-.50px", lineHeight: "1.00"
+                            }}
                         >
                             Send Invite
                         </button>
                         <button
                             onClick={() => setInviteTarget(null)}
                             className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2.5 rounded-xl font-bold transition-colors"
+                            style={{ 
+                                fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                                letterSpacing: "-.50px", lineHeight: "1.00"
+                            }}
                         >
                             Cancel
                         </button>
@@ -440,10 +466,20 @@ export function IntermissionCanvas({ localStream, className }: IntermissionCanva
             {/* Coffee Invite Overlay */}
             {incomingInvite && (
                 <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[60] bg-white rounded-xl shadow-2xl p-4 flex flex-col items-center gap-4 animate-in slide-in-from-top-4 border-2 border-indigo-500">
-                    <div className="text-lg font-bold text-slate-800">
+                    <div className="text-lg font-bold text-slate-800"
+                    style={{ 
+                        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                        letterSpacing: "-.50px", lineHeight: "1.00"
+                    }}
+                    >
                         ☕ Coffee Chat Request
                     </div>
-                    <div className="text-sm text-slate-600">
+                    <div className="text-sm text-slate-600"
+                    style={{ 
+                        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                        letterSpacing: "-.50px", lineHeight: "1.00"
+                    }}
+                    >
                         <span className="font-bold text-indigo-600">{incomingInvite.senderName}</span> wants to chat privately.
                     </div>
                     <div className="flex gap-2 w-full">
@@ -453,12 +489,20 @@ export function IntermissionCanvas({ localStream, className }: IntermissionCanva
                                 setIncomingInvite(null); // Wait for coffee_start to swap UI
                             }}
                             className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-bold shadow transition-colors"
+                            style={{ 
+                                fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                                letterSpacing: "-.50px", lineHeight: "1.00"
+                            }}
                         >
                             Accept
                         </button>
                         <button
                             onClick={() => setIncomingInvite(null)}
                             className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 py-2 rounded-lg font-bold transition-colors"
+                            style={{ 
+                                fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                                letterSpacing: "-.50px", lineHeight: "1.00"
+                            }}
                         >
                             Decline
                         </button>

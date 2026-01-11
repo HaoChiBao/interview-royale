@@ -166,17 +166,37 @@ export default function RoundPage() {
             <div className="w-full mb-6">
                  <div className="relative border-2 border-green-400 rounded-xl p-6 bg-white shadow-sm flex flex-col gap-2">
                      {/* Pill Badge */}
-                     <div className="absolute -top-3 left-6 bg-green-500 text-white text-xs font-bold px-4 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                     <div className="absolute -top-4 left-6 bg-green-500 text-white text-sm font-bold px-6 py-2 rounded-full uppercase tracking-wider shadow-sm"
+                     style={{ 
+                        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                        letterSpacing: "-.50px", lineHeight: "1.00"
+                    }}
+                    >
                          {question.type} Question
                      </div>
                      
                      <div className="flex justify-between items-start pt-2">
-                         <h1 className="text-xl md:text-2xl font-semibold leading-tight text-zinc-800 flex-1 pr-8">
+                         <h1 className="text-xl md:text-2xl font-semibold leading-tight text-zinc-800 flex-1 pr-8"
+                         style={{ 
+                            fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                            letterSpacing: "-.50px", lineHeight: "1.00"
+                        }}
+                         >
                              {question.prompt}
                          </h1>
                          {/* Compact Timer */}
-                          <div className="flex flex-col items-center bg-zinc-900 text-white px-3 py-2 rounded-lg">
-                              <span className="text-[10px] uppercase font-bold text-zinc-400 mb-0.5">Time Left</span>
+                          <div className="flex flex-col items-center bg-zinc-900 text-white px-3 py-2 rounded-lg"
+                          style={{ 
+                            fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                            letterSpacing: "-.50px", lineHeight: "1.00"
+                        }}
+                          >
+                              <span className="text-[10px] uppercase font-bold text-zinc-400 mb-0.5"
+                              style={{ 
+                                fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                                letterSpacing: "-.50px", lineHeight: "1.00"
+                            }}
+                              >Time Left</span>
                               <Timer endTime={roundEndTime} onExpire={handleExpire} />
                           </div>
                      </div>
@@ -232,6 +252,10 @@ export default function RoundPage() {
                              onClick={handleSubmit}
                              disabled={!textAnswer.trim()}
                              className="h-14 text-lg font-bold shadow-lg shadow-indigo-500/20 rounded-xl"
+                             style={{ 
+                                fontFamily: "Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+                                letterSpacing: "-.50px", lineHeight: "1.00"
+                            }}
                            >
                              Submit Answer
                            </Button>
