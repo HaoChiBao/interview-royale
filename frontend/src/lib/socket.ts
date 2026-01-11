@@ -117,6 +117,18 @@ class GameSocket {
       this.socket.send(JSON.stringify({ type: "video_update", frame }));
     }
   }
+
+  sendCoffeeInvite(targetId: string) {
+    this.send("coffee_invite", { target_id: targetId });
+  }
+
+  acceptCoffeeInvite(targetId: string) {
+    this.send("coffee_accept", { target_id: targetId });
+  }
+
+  leaveCoffeeChat(targetId?: string) {
+    this.send("coffee_leave", { target_id: targetId });
+  }
 }
 
 export const socketClient = new GameSocket();

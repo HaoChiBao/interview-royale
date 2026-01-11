@@ -7,8 +7,8 @@ import { useGameStore } from "@/store/useGameStore";
 import { socketClient } from "@/lib/socket";
 import { AvatarStickFigure } from "./AvatarStickFigure";
 import { AudioChat } from "./AudioChat";
+import { CoffeeChatModal } from "./CoffeeChatModal";
 import { cn } from "@/lib/utils";
-import infiniteTile from "@/assets/infinitetile.png";
 
 // Linear interpolation helper
 const lerp = (start: number, end: number, t: number) => {
@@ -19,6 +19,11 @@ export function IntermissionCanvas() {
     const me = useGameStore(s => s.me);
     const others = useGameStore(s => s.others);
     const intermissionEndTime = useGameStore(s => s.intermissionEndTime);
+
+    // Coffee Chat State
+    const [incomingInvite, setIncomingInvite] = useState<{ senderId: string, senderName: string } | null>(null);
+    const [coffeePartnerId, setCoffeePartnerId] = useState<string | null>(null);
+    const [inviteTarget, setInviteTarget] = useState<{ id: string, name: string } | null>(null);
 
     const [timeLeft, setTimeLeft] = useState(0);
 
@@ -54,7 +59,10 @@ export function IntermissionCanvas() {
         let localStream: MediaStream | null = null;
         const startVideo = async () => {
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                });
                 setStream(localStream);
 
                 // Video broadcasting is handled by VideoBroadcaster component in parent
@@ -107,6 +115,27 @@ export function IntermissionCanvas() {
             window.removeEventListener("keyup", handleKeyUp);
             window.removeEventListener("blur", handleBlur);
         };
+    }, []);
+
+    // 2.5 Coffee Chat Signaling
+    useEffect(() => {
+        const handleMsg = (e: CustomEvent) => {
+            const data = e.detail;
+
+            if (data.type === "coffee_invite") {
+                setIncomingInvite({ senderId: data.sender_id, senderName: data.sender_name });
+            }
+            else if (data.type === "coffee_start") {
+                setCoffeePartnerId(data.partner_id);
+                setIncomingInvite(null); // Clear invite if accepted
+            }
+            else if (data.type === "coffee_ended") {
+                setCoffeePartnerId(null);
+            }
+        };
+
+        window.addEventListener("game_socket_message" as any, handleMsg);
+        return () => window.removeEventListener("game_socket_message" as any, handleMsg);
     }, []);
 
     // Refs for loop access
@@ -190,20 +219,15 @@ export function IntermissionCanvas() {
 
     return (
         <div className="fixed inset-0 z-50 bg-[#F0F0F0] overflow-hidden">
-             {/* Infinite Tiled Background via CSS */}
-             <div 
-                className="absolute inset-0 pointer-events-none"
+            {/* Infinite Tiled Background via CSS */}
+            <div
+                className="absolute inset-0 pointer-events-none opacity-30"
                 style={{
-                    backgroundImage: `url(${infiniteTile.src})`,
-                    backgroundRepeat: "repeat",
-                    // User requested height approx 1000px. Setting 'auto 1000px' preserves aspect ratio.
-                    // If strict grid is needed, we can use '1000px 1000px'. 
-                    // Let's assume aspect ratio importance first, but user asked for tiles. 
-                    // Usually tiles are square-ish. Let's try 'auto 1000px' to match "height being 1000 pixels".
-                    backgroundSize: "auto 1000px", 
+                    backgroundImage: "linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)",
+                    backgroundSize: "40px 40px",
                     backgroundPosition: `${camOffsetX}px ${camOffsetY}px`
                 }}
-             />
+            />
 
             <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-white/90 px-6 py-2 rounded-full shadow-lg border border-blue-100 z-50 flex flex-col items-center">
                 <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">
@@ -271,6 +295,12 @@ export function IntermissionCanvas() {
                             isMoving={player?.isMoving}
                             facingRight={player?.facingRight}
                             volume={audioVolumes[player?.id || ""]}
+                            isChatting={player?.isChatting}
+                            onClick={() => {
+                                if (!isMe && player?.id) {
+                                    setInviteTarget({ id: player.id, name: player.name });
+                                }
+                            }}
                         />
                     </div>
                 );
@@ -362,9 +392,79 @@ export function IntermissionCanvas() {
             })()}
 
 
+            {/* Outgoing Invite Popup */}
+            {inviteTarget && (
+                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[60] bg-white rounded-2xl shadow-2xl p-6 flex flex-col items-center gap-4 animate-in zoom-in-95 duration-200 border border-slate-200 max-w-sm w-full">
+                    <div className="text-xl font-bold text-slate-800">Start Coffee Chat?</div>
+                    <div className="text-center text-slate-600">
+                        Invite <span className="font-bold text-indigo-600">{inviteTarget.name}</span> to a private breakout room?
+                    </div>
+                    <div className="flex gap-3 w-full mt-2">
+                        <button
+                            onClick={() => {
+                                socketClient.sendCoffeeInvite(inviteTarget.id);
+                                setInviteTarget(null);
+                            }}
+                            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all hover:scale-105 active:scale-95"
+                        >
+                            Send Invite
+                        </button>
+                        <button
+                            onClick={() => setInviteTarget(null)}
+                            className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2.5 rounded-xl font-bold transition-colors"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Coffee Invite Overlay */}
+            {incomingInvite && (
+                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[60] bg-white rounded-xl shadow-2xl p-4 flex flex-col items-center gap-4 animate-in slide-in-from-top-4 border-2 border-indigo-500">
+                    <div className="text-lg font-bold text-slate-800">
+                        ☕ Coffee Chat Request
+                    </div>
+                    <div className="text-sm text-slate-600">
+                        <span className="font-bold text-indigo-600">{incomingInvite.senderName}</span> wants to chat privately.
+                    </div>
+                    <div className="flex gap-2 w-full">
+                        <button
+                            onClick={() => {
+                                socketClient.acceptCoffeeInvite(incomingInvite.senderId);
+                                setIncomingInvite(null); // Wait for coffee_start to swap UI
+                            }}
+                            className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-bold shadow transition-colors"
+                        >
+                            Accept
+                        </button>
+                        <button
+                            onClick={() => setIncomingInvite(null)}
+                            className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 py-2 rounded-lg font-bold transition-colors"
+                        >
+                            Decline
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Coffee Chat Modal */}
+            {coffeePartnerId && (
+                <CoffeeChatModal
+                    partnerName={others.find(o => o.id === coffeePartnerId)?.name || "Partner"}
+                    partnerFrame={others.find(o => o.id === coffeePartnerId)?.lastVideoFrame}
+                    localStream={stream}
+                    onLeave={() => {
+                        socketClient.leaveCoffeeChat(coffeePartnerId);
+                        setCoffeePartnerId(null);
+                    }}
+                />
+            )}
+
             <AudioChat
                 visualState={visualState}
                 onVolumeChange={(vols) => setAudioVolumes(vols)}
+                privatePeerId={coffeePartnerId}
             />
         </div>
     );

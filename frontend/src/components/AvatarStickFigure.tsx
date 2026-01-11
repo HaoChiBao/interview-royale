@@ -13,6 +13,8 @@ interface AvatarStickFigureProps {
   isMoving?: boolean;
   facingRight?: boolean;
   volume?: number; // 0 to 1
+  onClick?: () => void;
+  isChatting?: boolean;
 }
 
 import idleImage from "@/assets/idle.png";
@@ -29,6 +31,8 @@ export function AvatarStickFigure({
   isMoving,
   facingRight = true, // Default to true if undefined
   volume = 0,
+  onClick,
+  isChatting,
 }: AvatarStickFigureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -39,7 +43,28 @@ export function AvatarStickFigure({
   }, [stream]);
 
   return (
-    <div className={cn("relative flex flex-col items-center", className)}>
+    <div
+      onClick={onClick}
+      className={cn(
+        "relative flex flex-col items-center group",
+        onClick && "cursor-pointer hover:scale-105 active:scale-95 transition-transform",
+        className
+      )}
+    >
+      {/* Chat in Progress Bubble */}
+      {isChatting && (
+        <div className="absolute -top-8 z-30 bg-white border-2 border-slate-300 rounded-2xl px-3 py-1.5 shadow-lg animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex gap-1 items-center justify-center">
+            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider whitespace-nowrap">On Call</span>
+            <span className="flex gap-0.5">
+              <span className="w-1 h-1 bg-green-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+              <span className="w-1 h-1 bg-green-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+              <span className="w-1 h-1 bg-green-500 rounded-full animate-bounce"></span>
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Crown for Leader */}
       {isLeader && (
         <div className="absolute -top-12 text-3xl animate-bounce z-20">👑</div>
