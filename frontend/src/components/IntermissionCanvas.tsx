@@ -8,6 +8,7 @@ import { socketClient } from "@/lib/socket";
 import { AvatarStickFigure } from "./AvatarStickFigure";
 import { AudioChat } from "./AudioChat";
 import { cn } from "@/lib/utils";
+import infiniteTile from "@/assets/infinitetile.png";
 
 // Linear interpolation helper
 const lerp = (start: number, end: number, t: number) => {
@@ -181,9 +182,6 @@ export function IntermissionCanvas() {
     const myVisualPos = me && visualState[me.id] ? visualState[me.id] : { x: 400, y: 300 };
 
     // Calculate Camera Offset
-    // We want 'myVisualPos' to be at center of screen
-    // Offset = Center - PlayerPos
-    // World 0,0 would be at Center + Offset
     const centerX = viewport.width / 2;
     const centerY = viewport.height / 2;
 
@@ -191,16 +189,21 @@ export function IntermissionCanvas() {
     const camOffsetY = centerY - myVisualPos.y;
 
     return (
-        <div className="fixed inset-0 z-50 bg-slate-50 overflow-hidden">
-            {/* Grid Background */}
-            <div className="absolute inset-0 opacity-10 pointer-events-none"
+        <div className="fixed inset-0 z-50 bg-[#F0F0F0] overflow-hidden">
+             {/* Infinite Tiled Background via CSS */}
+             <div 
+                className="absolute inset-0 pointer-events-none"
                 style={{
-                    backgroundImage: "linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)",
-                    backgroundSize: "50px 50px",
-                    // Move background opposite to player movement (or rather, fixed to world space)
+                    backgroundImage: `url(${infiniteTile.src})`,
+                    backgroundRepeat: "repeat",
+                    // User requested height approx 1000px. Setting 'auto 1000px' preserves aspect ratio.
+                    // If strict grid is needed, we can use '1000px 1000px'. 
+                    // Let's assume aspect ratio importance first, but user asked for tiles. 
+                    // Usually tiles are square-ish. Let's try 'auto 1000px' to match "height being 1000 pixels".
+                    backgroundSize: "auto 1000px", 
                     backgroundPosition: `${camOffsetX}px ${camOffsetY}px`
                 }}
-            />
+             />
 
             <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-white/90 px-6 py-2 rounded-full shadow-lg border border-blue-100 z-50 flex flex-col items-center">
                 <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">
