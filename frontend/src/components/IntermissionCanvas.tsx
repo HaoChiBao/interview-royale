@@ -7,7 +7,9 @@ import { useGameStore } from "@/store/useGameStore";
 import { socketClient } from "@/lib/socket";
 import { AvatarStickFigure } from "./AvatarStickFigure";
 import { AudioChat } from "./AudioChat";
+import { CoffeeChatModal } from "./CoffeeChatModal";
 import { cn } from "@/lib/utils";
+import { LeaderboardOverlay } from "./LeaderboardOverlay";
 
 // Linear interpolation helper
 const lerp = (start: number, end: number, t: number) => {
@@ -16,13 +18,19 @@ const lerp = (start: number, end: number, t: number) => {
 
 interface IntermissionCanvasProps {
     localStream?: MediaStream | null;
+    className?: string; // Allow custom styling/z-index
 }
 
-export function IntermissionCanvas({ localStream }: IntermissionCanvasProps) {
+export function IntermissionCanvas({ localStream, className }: IntermissionCanvasProps) {
     const me = useGameStore(s => s.me);
     const others = useGameStore(s => s.others);
     const phase = useGameStore(s => s.phase);
     const intermissionEndTime = useGameStore(s => s.intermissionEndTime);
+
+    // Coffee Chat State
+    const [incomingInvite, setIncomingInvite] = useState<{ senderId: string, senderName: string } | null>(null);
+    const [coffeePartnerId, setCoffeePartnerId] = useState<string | null>(null);
+    const [inviteTarget, setInviteTarget] = useState<{ id: string, name: string } | null>(null);
 
     const [timeLeft, setTimeLeft] = useState(0);
 
@@ -56,6 +64,10 @@ export function IntermissionCanvas({ localStream }: IntermissionCanvasProps) {
     // 2. Input Handling
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if typing in an input
+            const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+            if (tag === 'input' || tag === 'textarea') return;
+
             const key = e.key.toLowerCase();
             if (["w", "a", "s", "d"].includes(key)) {
                 if (!pressedKeys.current.has(key)) {
@@ -66,6 +78,10 @@ export function IntermissionCanvas({ localStream }: IntermissionCanvasProps) {
         };
 
         const handleKeyUp = (e: KeyboardEvent) => {
+             // We generally want to allow keyup even if focused, to clear state, 
+             // but strictly speaking if they focused input while holding, it might get stuck.
+             // For now, let's just let keyup pass through or apply same check.
+             // Better to let keyup pass so we don't get stuck keys if they ctrl-tab or click away.
             const key = e.key.toLowerCase();
             if (["w", "a", "s", "d"].includes(key)) {
                 pressedKeys.current.delete(key);
@@ -90,6 +106,27 @@ export function IntermissionCanvas({ localStream }: IntermissionCanvasProps) {
             window.removeEventListener("keyup", handleKeyUp);
             window.removeEventListener("blur", handleBlur);
         };
+    }, []);
+
+    // 2.5 Coffee Chat Signaling
+    useEffect(() => {
+        const handleMsg = (e: CustomEvent) => {
+            const data = e.detail;
+
+            if (data.type === "coffee_invite") {
+                setIncomingInvite({ senderId: data.sender_id, senderName: data.sender_name });
+            }
+            else if (data.type === "coffee_start") {
+                setCoffeePartnerId(data.partner_id);
+                setIncomingInvite(null); // Clear invite if accepted
+            }
+            else if (data.type === "coffee_ended") {
+                setCoffeePartnerId(null);
+            }
+        };
+
+        window.addEventListener("game_socket_message" as any, handleMsg);
+        return () => window.removeEventListener("game_socket_message" as any, handleMsg);
     }, []);
 
     // Refs for loop access
@@ -172,7 +209,7 @@ export function IntermissionCanvas({ localStream }: IntermissionCanvasProps) {
     const camOffsetY = centerY - myVisualPos.y;
 
     return (
-        <div className="fixed inset-0 z-50 bg-[#F0F0F0] overflow-hidden">
+        <div className={cn("fixed inset-0 z-50 bg-[#F0F0F0] overflow-hidden", className)}>
              {/* Grid Background */}
              <div className="absolute inset-0 opacity-10 pointer-events-none" 
                   style={{ 
@@ -192,8 +229,8 @@ export function IntermissionCanvas({ localStream }: IntermissionCanvasProps) {
             )}
 
             {/* MAIN INTERMISSION PANEL (Bottom Center) - Compact & Sleek */}
-            {/* HIDE IN LOBBY */}
-            {phase !== "LOBBY" && (
+            {/* HIDE IN LOBBY AND ROUND */}
+            {phase !== "LOBBY" && phase !== "ROUND" && (
                 <div className="absolute bottom-12 left-1/2 -translate-x-1/2 bg-white/95 px-6 py-4 rounded-2xl shadow-2xl shadow-black/5 border border-zinc-100 z-50 flex flex-col items-center gap-1.5 backdrop-blur-sm min-w-[240px]">
                     <h2 className="text-lg font-bold text-zinc-900 tracking-tight">
                         Intermission
@@ -246,8 +283,11 @@ export function IntermissionCanvas({ localStream }: IntermissionCanvasProps) {
                 const isMe = me?.id === id;
                 const player = isMe ? me : others.find(o => o.id === id);
 
-                // Only show if submitted (or if it's me, or if in LOBBY)
-                if (!isMe && !player?.hasSubmitted && phase !== "LOBBY") return null;
+                // Check condition: Show if Me, if Submitted, OR IF LEADER.
+                // Also always show in LOBBY.
+                const shouldShow = isMe || phase === "LOBBY" || player?.hasSubmitted || player?.isLeader;
+
+                if (!shouldShow) return null;
 
                 // Apply camera offset
                 const screenX = pos.x + camOffsetX;
@@ -273,6 +313,12 @@ export function IntermissionCanvas({ localStream }: IntermissionCanvasProps) {
                             isMoving={player?.isMoving}
                             facingRight={player?.facingRight}
                             volume={audioVolumes[player?.id || ""]}
+                            isChatting={player?.isChatting}
+                            onClick={() => {
+                                if (!isMe && player?.id) {
+                                    setInviteTarget({ id: player.id, name: player.name });
+                                }
+                            }}
                         />
                     </div>
                 );
@@ -284,7 +330,7 @@ export function IntermissionCanvas({ localStream }: IntermissionCanvasProps) {
                 const minimapPlayers = [];
                 if (me) minimapPlayers.push(me);
                 others.forEach(p => {
-                    if (p.hasSubmitted) minimapPlayers.push(p);
+                    if (p.hasSubmitted || p.isLeader) minimapPlayers.push(p);
                 });
 
                 if (minimapPlayers.length === 0) return null;
@@ -364,9 +410,81 @@ export function IntermissionCanvas({ localStream }: IntermissionCanvasProps) {
             })()}
 
 
+            {/* Outgoing Invite Popup */}
+            {inviteTarget && (
+                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[60] bg-white rounded-2xl shadow-2xl p-6 flex flex-col items-center gap-4 animate-in zoom-in-95 duration-200 border border-slate-200 max-w-sm w-full">
+                    <div className="text-xl font-bold text-slate-800">Start Coffee Chat?</div>
+                    <div className="text-center text-slate-600">
+                        Invite <span className="font-bold text-indigo-600">{inviteTarget.name}</span> to a private breakout room?
+                    </div>
+                    <div className="flex gap-3 w-full mt-2">
+                        <button
+                            onClick={() => {
+                                socketClient.sendCoffeeInvite(inviteTarget.id);
+                                setInviteTarget(null);
+                            }}
+                            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all hover:scale-105 active:scale-95"
+                        >
+                            Send Invite
+                        </button>
+                        <button
+                            onClick={() => setInviteTarget(null)}
+                            className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2.5 rounded-xl font-bold transition-colors"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Coffee Invite Overlay */}
+            {incomingInvite && (
+                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[60] bg-white rounded-xl shadow-2xl p-4 flex flex-col items-center gap-4 animate-in slide-in-from-top-4 border-2 border-indigo-500">
+                    <div className="text-lg font-bold text-slate-800">
+                        ☕ Coffee Chat Request
+                    </div>
+                    <div className="text-sm text-slate-600">
+                        <span className="font-bold text-indigo-600">{incomingInvite.senderName}</span> wants to chat privately.
+                    </div>
+                    <div className="flex gap-2 w-full">
+                        <button
+                            onClick={() => {
+                                socketClient.acceptCoffeeInvite(incomingInvite.senderId);
+                                setIncomingInvite(null); // Wait for coffee_start to swap UI
+                            }}
+                            className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-bold shadow transition-colors"
+                        >
+                            Accept
+                        </button>
+                        <button
+                            onClick={() => setIncomingInvite(null)}
+                            className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 py-2 rounded-lg font-bold transition-colors"
+                        >
+                            Decline
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Coffee Chat Modal */}
+            {coffeePartnerId && (
+                <CoffeeChatModal
+                    partnerName={others.find(o => o.id === coffeePartnerId)?.name || "Partner"}
+                    partnerFrame={others.find(o => o.id === coffeePartnerId)?.lastVideoFrame}
+                    localStream={stream}
+                    onLeave={() => {
+                        socketClient.leaveCoffeeChat(coffeePartnerId);
+                        setCoffeePartnerId(null);
+                    }}
+                />
+            )}
+
+            <LeaderboardOverlay />
+
             <AudioChat
                 visualState={visualState}
                 onVolumeChange={(vols) => setAudioVolumes(vols)}
+                privatePeerId={coffeePartnerId}
             />
         </div>
     );

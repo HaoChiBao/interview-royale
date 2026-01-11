@@ -17,6 +17,7 @@ export interface Player {
   isMoving?: boolean;
   facingRight?: boolean;
   isLeader?: boolean;
+  isChatting?: boolean;
 }
 
 export interface Question {

@@ -15,7 +15,7 @@ export function VideoBroadcaster({ stream }: VideoBroadcasterProps) {
     video.srcObject = stream;
     video.muted = true;
     // Silence AbortError (interrupted by load/pause) which is common during re-renders
-    video.play().catch(() => {});
+    video.play().catch(() => { });
 
     const ctx = canvasRef.current.getContext("2d");
     if (!ctx) return;
@@ -24,7 +24,7 @@ export function VideoBroadcaster({ stream }: VideoBroadcasterProps) {
     const interval = setInterval(() => {
       if (video.readyState === video.HAVE_ENOUGH_DATA) {
         // Center crop to square (1:1)
-        const size = 140;
+        const size = 360; // Increased from 140 for better quality (approx 360p square)
         const vRatio = video.videoWidth / video.videoHeight;
         let sx, sy, sWidth, sHeight;
 
@@ -41,14 +41,14 @@ export function VideoBroadcaster({ stream }: VideoBroadcasterProps) {
           sx = 0;
           sy = (video.videoHeight - sHeight) / 2;
         }
-        
+
         // Safety check if canvas is still mounted
         if (!canvasRef.current) return;
 
         ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, size, size);
-        
-        // Compress to JPEG 0.1 quality (Reduced to lower latency)
-        const frame = canvasRef.current.toDataURL("image/jpeg", 0.1);
+
+        // Compress to JPEG 0.4 (Better visibility, still compressed)
+        const frame = canvasRef.current.toDataURL("image/jpeg", 0.4);
         socketClient.sendVideoFrame(frame);
       }
     }, 66); // ~15 FPS
@@ -59,11 +59,11 @@ export function VideoBroadcaster({ stream }: VideoBroadcasterProps) {
     // just nullify srcObject which stops stream usage.
     return () => {
       clearInterval(interval);
-      video.srcObject = null; 
+      video.srcObject = null;
       // video.pause(); // REMOVED to prevent AbortError if play() is pending
     };
   }, [stream]);
 
   // Invisible canvas
-  return <canvas ref={canvasRef} width={140} height={140} className="hidden" />;
+  return <canvas ref={canvasRef} width={360} height={360} className="hidden" />;
 }

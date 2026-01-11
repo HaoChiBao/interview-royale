@@ -30,6 +30,7 @@ class PlayerState:
         self.keys = {"w": False, "a": False, "s": False, "d": False}
         self.is_moving = False
         self.facing_right = True
+        self.is_chatting = False # New state
         self.last_update = time.time()
 
 class Game:
@@ -108,7 +109,10 @@ class Game:
                     "y": p.y, 
                     "username": p.username,
                     "is_moving": p.is_moving,
-                    "facing_right": p.facing_right
+                    "username": p.username,
+                    "is_moving": p.is_moving,
+                    "facing_right": p.facing_right,
+                    "is_chatting": p.is_chatting
                 }
             
             if state_snapshot:
@@ -192,9 +196,11 @@ class Game:
         duration = self.settings["round_duration"]
         await asyncio.sleep(duration)
         
-        # Check if we are still in the same round and state is QUESTION
+            # Check if we are still in the same round and state is QUESTION
         if self.state == "QUESTION" and self.current_round == round_num:
-            print(f"Round {round_num} time expired. Force ending.")
+            print(f"Round {round_num} time expired. Batch grading...")
+            
+            await self.perform_batch_grading()
             results = self.end_round()
             leaderboard = self.get_leaderboard()
             
@@ -210,6 +216,28 @@ class Game:
             
             # Start intermission
             asyncio.create_task(self.handle_intermission(room_code))
+
+    async def perform_batch_grading(self):
+        print("Starting batch grading...")
+        tasks = []
+        user_ids_to_grade = []
+
+        for uid, data in self.submissions.items():
+            # If no score yet, grade it
+            if data.get("score") is None:
+                content = data.get("content", "")
+                tasks.append(grade_submission(content, self.current_question))
+                user_ids_to_grade.append(uid)
+        
+        if tasks:
+            results = await asyncio.gather(*tasks)
+            
+            for uid, result in zip(user_ids_to_grade, results):
+                self.submissions[uid]["score"] = result["score"]
+                self.submissions[uid]["feedback"] = result["feedback"]
+                print(f"Graded {uid}: {result['score']}")
+        
+        print("Batch grading complete.")
 
     def end_round(self):
         self.state = "RESULTS"
@@ -276,6 +304,15 @@ class ConnectionManager:
             print(f"Client {user_id} disconnected from room {room_code}. Total: {len(self.active_connections)}")
             return room_code, user_id
         return None, None
+
+    async def send_personal_message(self, user_id: str, message: dict):
+        for connection, data in self.active_connections.items():
+            if data.get("user_id") == user_id:
+                try:
+                    await connection.send_json(message)
+                except:
+                    pass
+                return
 
     async def broadcast_to_room(self, room_code: str, message: dict):
         if not room_code: return
@@ -611,21 +648,15 @@ async def websocket_endpoint(websocket: WebSocket):
                 user_id = manager.active_connections[websocket]["user_id"]
                 submission_content = data.get("content")
                 
-                # Grade immediately
-                result = await grade_submission(submission_content, game.current_question)
-                
-                # Store result keyed by user_id
+                # Store submission WITHOUT grading
                 game.submissions[user_id] = {
                     "content": submission_content,
-                    "score": result["score"],
-                    "feedback": result["feedback"]
+                    "score": None,     # Will be populated by batch grading
+                    "feedback": []
                 }
                 
-                # Notify user of their result
-                await websocket.send_json({
-                    "type": "grading_complete",
-                    "result": result
-                })
+                # Notify user receipt (optional, or just wait for round_over)
+                # await websocket.send_json({ "type": "submission_received" })
                 
                 # Check for round end
                 room_players_count = len([
@@ -634,6 +665,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 ])
                 
                 if len(game.submissions) >= room_players_count:
+                    print("All players submitted. Triggering batch grading...")
+                    # Trigger batch grading now
+                    await game.perform_batch_grading()
+                    
                     results = game.end_round()
                     leaderboard = game.get_leaderboard()
                     
@@ -668,13 +703,74 @@ async def websocket_endpoint(websocket: WebSocket):
                 user_id = manager.active_connections[websocket]["user_id"]
                 room_code = manager.active_connections[websocket]["room_code"]
                 chunk = data.get("chunk")
+                to_id = data.get("to_id")
                 
                 if room_code:
-                     await manager.broadcast_to_room(room_code, {
-                        "type": "audio_update",
-                        "id": user_id,
-                        "chunk": chunk
-                     })
+                     if to_id:
+                         # Private Unicast
+                         await manager.send_personal_message(to_id, {
+                            "type": "audio_update",
+                            "id": user_id,
+                            "chunk": chunk
+                         })
+                     else:
+                         # Public Broadcast
+                         await manager.broadcast_to_room(room_code, {
+                            "type": "audio_update",
+                            "id": user_id,
+                            "chunk": chunk
+                         })
+
+            elif message_type == "coffee_invite":
+                target_id = data.get("target_id")
+                sender_id = manager.active_connections[websocket]["user_id"]
+                sender_name = manager.active_connections[websocket]["username"]
+                
+                await manager.send_personal_message(target_id, {
+                    "type": "coffee_invite",
+                    "sender_id": sender_id,
+                    "sender_name": sender_name
+                })
+
+            elif message_type == "coffee_accept":
+                target_id = data.get("target_id") # The person who invited me
+                sender_id = manager.active_connections[websocket]["user_id"]
+                room_code = manager.active_connections[websocket]["room_code"]
+                
+                # Update state
+                if room_code in games:
+                    if sender_id in games[room_code].players:
+                        games[room_code].players[sender_id].is_chatting = True
+                    if target_id in games[room_code].players:
+                        games[room_code].players[target_id].is_chatting = True
+                
+                # Notify both to start
+                await manager.send_personal_message(target_id, {
+                    "type": "coffee_start",
+                    "partner_id": sender_id
+                })
+                await manager.send_personal_message(sender_id, {
+                    "type": "coffee_start",
+                    "partner_id": target_id
+                })
+
+            elif message_type == "coffee_leave":
+                target_id = data.get("target_id") # The partner
+                sender_id = manager.active_connections[websocket]["user_id"]
+                room_code = manager.active_connections[websocket]["room_code"]
+
+                # Update state
+                if room_code in games:
+                    if sender_id in games[room_code].players:
+                        games[room_code].players[sender_id].is_chatting = False
+                    if target_id in games[room_code].players:
+                        games[room_code].players[target_id].is_chatting = False
+                
+                if target_id:
+                     await manager.send_personal_message(target_id, {
+                        "type": "coffee_ended",
+                        "partner_id": sender_id
+                    })
 
             elif message_type == "keydown":
                 user_id = manager.active_connections[websocket]["user_id"]

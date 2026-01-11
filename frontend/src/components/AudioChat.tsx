@@ -44,9 +44,10 @@ function base64ToFloat32(base64: string): Float32Array {
 interface AudioChatProps {
     visualState: Record<string, { x: number, y: number }>;
     onVolumeChange: (volumes: Record<string, number>) => void;
+    privatePeerId?: string | null;
 }
 
-export function AudioChat({ visualState, onVolumeChange }: AudioChatProps) {
+export function AudioChat({ visualState, onVolumeChange, privatePeerId }: AudioChatProps) {
     const me = useGameStore(s => s.me);
 
     // Audio Context Refs
@@ -57,6 +58,12 @@ export function AudioChat({ visualState, onVolumeChange }: AudioChatProps) {
     // Analysis Refs
     const analysersRef = useRef<Record<string, AnalyserNode>>({});
     const animationFrameRef = useRef<number | undefined>(undefined);
+
+    // Private Peer Ref (for access in closures)
+    const privatePeerIdRef = useRef<string | null>(null);
+    useEffect(() => {
+        privatePeerIdRef.current = privatePeerId || null;
+    }, [privatePeerId]);
 
     // Remote Peers State
     // access via refs to avoid closure staleness in message handlers
@@ -125,7 +132,12 @@ export function AudioChat({ visualState, onVolumeChange }: AudioChatProps) {
                     }
                     const base64 = window.btoa(binary);
 
-                    socketClient.send("audio_update", { chunk: base64 });
+                    const payload: any = { chunk: base64 };
+                    if (privatePeerIdRef.current) {
+                        payload.to_id = privatePeerIdRef.current;
+                    }
+
+                    socketClient.send("audio_update", payload);
                 };
 
                 // Connect graph
@@ -158,6 +170,11 @@ export function AudioChat({ visualState, onVolumeChange }: AudioChatProps) {
             const data = e.detail;
             if (data.type !== "audio_update") return;
             if (data.id === me?.id) return; // Ignore self
+
+            // Audio Isolation: If in private chat, ignore everyone except partner
+            if (privatePeerIdRef.current && data.id !== privatePeerIdRef.current) {
+                return;
+            }
 
             const ctx = audioCtxRef.current;
             if (!ctx || ctx.state === "closed") return;
