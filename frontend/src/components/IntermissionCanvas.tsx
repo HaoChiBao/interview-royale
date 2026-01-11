@@ -207,6 +207,16 @@ export function IntermissionCanvas() {
                        ? `Next round in ${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`
                        : "Starting soon..."}
                  </p>
+                 
+                 {/* Leader Controls */}
+                 {me?.isLeader && timeLeft > 0 && (
+                     <button 
+                        onClick={() => socketClient.send("skip_intermission", {})}
+                        className="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1 rounded-full shadow transition-colors"
+                     >
+                         Skip Intermission
+                     </button>
+                 )}
              </div>
 
              <div className="absolute bottom-8 left-8 bg-white/80 p-3 rounded-xl shadow backdrop-blur-sm text-sm text-slate-600 border border-slate-200">

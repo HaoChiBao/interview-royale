@@ -43,8 +43,15 @@ export default function RoundPage() {
       router.push(`/room/${code}/grading`);
     } else if (phase === "LOBBY") {
        router.push(`/room/${code}`);
+    } else if (phase === "GAME_OVER") {
+        router.push(`/room/${code}/results`); // Reuse results page or make new one? Results page can handle Game Over.
     }
   }, [phase, code, router]);
+
+  // Reset input when question changes
+  useEffect(() => {
+      setTextAnswer((question as any)?.starter_code || "");
+  }, [question]);
 
   // Acquire media
   useEffect(() => {
@@ -111,7 +118,7 @@ export default function RoundPage() {
                Let's put `Recorder` in main area.
            */}
            <Card className="flex-1 flex flex-col items-center justify-center p-8 bg-zinc-50 border-dashed">
-              <div className="w-full max-w-md space-y-6 text-center">
+              <div className="w-full max-w-2xl space-y-6 text-center">
                  {/* Video Preview */}
                  <div className="relative aspect-video bg-black rounded-lg overflow-hidden shadow-2xl">
                     {localStream && (
@@ -139,11 +146,32 @@ export default function RoundPage() {
                          </div>
                      ) : (
                          <div className="space-y-4">
-                             <SpeechTextarea 
-                               value={textAnswer}
-                               onChange={setTextAnswer}
-                               placeholder="Type your answer or use microphone..."
-                             />
+                             {question.type === "technical" ? (
+                                <div className="relative group">
+                                    <div className="absolute top-0 left-0 right-0 h-8 bg-zinc-800 rounded-t-lg flex items-center px-4 justify-between border-b border-zinc-700">
+                                        <div className="flex gap-1.5">
+                                            <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                                            <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                                            <div className="w-3 h-3 rounded-full bg-green-500/80" />
+                                        </div>
+                                        <div className="text-[10px] font-mono text-zinc-400">main.py</div>
+                                    </div>
+                                    <textarea
+                                        value={textAnswer || (question as any).starter_code || ""}
+                                        onChange={(e) => setTextAnswer(e.target.value)}
+                                        className="w-full min-h-[400px] mt-0 pt-10 p-4 rounded-lg bg-[#1e1e1e] text-zinc-100 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 border border-zinc-700 shadow-inner font-ligatures-contextual"
+                                        spellCheck={false}
+                                        style={{ fontFamily: "'Fira Code', 'JetBrains Mono', monospace" }}
+                                    />
+                                </div>
+                             ) : (
+                                <SpeechTextarea 
+                                    value={textAnswer}
+                                    onChange={setTextAnswer}
+                                    placeholder="Type your answer or use microphone..."
+                                />
+                             )}
+                             
                              <Button 
                                size="lg" 
                                className="w-full text-lg" 

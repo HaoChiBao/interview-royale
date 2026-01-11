@@ -30,6 +30,7 @@ interface GameState {
   intermissionEndTime: number | null;
   votes: Record<string, number>; // username -> rounds
   isChoosingSettings: boolean;
+  isStarting: boolean;
   chosenSettings: { num_rounds: number; all_votes: number[] } | null;
 
   // Actions
@@ -71,6 +72,7 @@ export const useGameStore = create<GameState>((set) => ({
   intermissionEndTime: null,
   votes: {},
   isChoosingSettings: false,
+  isStarting: false,
   chosenSettings: null,
 
   debugLogState: false,
@@ -143,6 +145,7 @@ export const useGameStore = create<GameState>((set) => ({
                     id: p.username,
                     name: p.username,
                     isMe: false,
+                    isLeader: msg.leader === p.username,
                 // Preserve existing state
                     lastVideoFrame: existing?.lastVideoFrame,
                     cameraEnabled: existing?.cameraEnabled,
@@ -152,30 +155,35 @@ export const useGameStore = create<GameState>((set) => ({
                 };
              });
           
-          return { others: mergedOthers };
+          let myUpdates = {};
+          if (state.me && msg.leader === state.me.name) {
+              myUpdates = { isLeader: true };
+          } else if (state.me && msg.leader !== state.me.name && state.me.isLeader) {
+              myUpdates = { isLeader: false };
+          }
+
+          return { 
+              others: mergedOthers,
+              me: state.me ? { ...state.me, ...myUpdates } : state.me
+          };
 
         case "settings_update":
             return { 
                 gameSettings: msg.settings,
-                votes: msg.votes || {} 
+                // votes: msg.votes || {} // No longer using votes
             };
         
-        case "settings_chosen":
-             // Trigger animation
+        case "game_starting":
              return {
-                 isChoosingSettings: true,
-                 chosenSettings: { 
-                     num_rounds: msg.winner, 
-                     all_votes: msg.all_votes 
-                 }
-                 // The component will read this and start animating.
-                 // After animation, it will wait for "new_question"
+                 isStarting: true,
+                 isChoosingSettings: false
              };
 
         case "new_question":
              return {
                 phase: "ROUND",
-                isChoosingSettings: false, // Stop animation
+                isStarting: false,
+                isChoosingSettings: false, 
                 currentQuestion: msg.question,
                 roundDuration: state.gameSettings.round_duration, 
                 roundEndTime: Date.now() + state.gameSettings.round_duration * 1000,
@@ -266,6 +274,29 @@ export const useGameStore = create<GameState>((set) => ({
                 others: newOthers
             };
              
+        case "sync_game_state":
+            // { phase, question, current_round, total_rounds }
+            return {
+                phase: msg.phase === "QUESTION" ? "ROUND" : msg.phase,
+                currentQuestion: msg.question,
+                gameSettings: { 
+                    ...state.gameSettings, 
+                    num_rounds: msg.total_rounds 
+                },
+                // If we want to show correct round number in UI
+                // We might need to store 'currentRoundNumber' in store if not present
+                // For now, at least we have the question and phase.
+                roundEndTime: msg.round_end_time ? msg.round_end_time * 1000 : Date.now() + 60000, 
+            };
+
+        case "settings_update":
+            // { type: "settings_update", settings: {...}, votes: {...} }
+            console.log("Received settings_update:", msg);
+            return {
+                gameSettings: msg.settings,
+                votes: msg.votes
+            };
+
         default:
           return {};
       }

@@ -1,97 +1,202 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useGameStore } from "@/store/useGameStore";
-import { Bot, Users } from "lucide-react";
+import TitleImage from "@/assets/title.png";
+import CreateRoomImage from "@/assets/createroom.png";
+import JoinFriendImage from "@/assets/joinfriend.png";
+import SoloQueueImage from "@/assets/soloqueue.png";
 
 export default function Home() {
   const router = useRouter();
-  const [name, setName] = useState("");
+  const [createName, setCreateName] = useState("");
+  const [joinName, setJoinName] = useState("");
+  const [soloName, setSoloName] = useState("");
   const [roomCode, setRoomCode] = useState("");
+  const [showContent, setShowContent] = useState(false);
   
+  useEffect(() => {
+      const timer = setTimeout(() => {
+          setShowContent(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+  }, []);
+
   const handleCreate = () => {
-    if (!name.trim()) return;
+    if (!createName.trim()) return;
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    localStorage.setItem("interview-royale-name", name);
+    localStorage.setItem("interview-royale-name", createName);
     router.push(`/preflight?code=${code}&create=true`);
   };
 
   const handleJoin = () => {
-    if (!name.trim() || !roomCode.trim()) return;
-    localStorage.setItem("interview-royale-name", name);
+    if (!joinName.trim() || !roomCode.trim()) return;
+    localStorage.setItem("interview-royale-name", joinName);
     router.push(`/preflight?code=${roomCode}`);
   };
 
+  const handleSolo = () => {
+      if (!soloName.trim()) return;
+      // Solo queue logic: For now, acts like creating a private room
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      localStorage.setItem("interview-royale-name", soloName);
+      router.push(`/preflight?code=${code}&create=true`);
+  };
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-24 bg-white text-zinc-900">
-      <div className="mb-8 text-center space-y-2">
-         <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">
-           Interview <span className="text-indigo-600">Royale</span>
-         </h1>
-         <p className="text-muted-foreground text-lg max-w-md mx-auto">
-           Battle against bots (or friends) to answer behavioural questions.
-         </p>
+    <main className="relative flex min-h-screen flex-col items-center justify-center p-4 md:p-12 bg-white text-zinc-900 overflow-hidden font-sans">
+      
+      {/* Intro Banner */}
+      <div 
+        className={`absolute z-20 flex flex-col items-center transition-all duration-1000 ease-in-out
+          ${showContent 
+            ? 'top-4 left-0 right-0 h-32 justify-start' 
+            : 'inset-0 justify-center'
+          }`}
+      >
+          <div className={`relative transition-all duration-1000 ${showContent ? 'w-64 md:w-80' : 'w-[80vw]'} px-4`}>
+              <Image 
+                src={TitleImage} 
+                alt="Interview Royale" 
+                priority
+                className="w-full h-auto object-contain"
+              />
+          </div>
+          <p 
+            className={`mt-8 text-3xl md:text-5xl font-normal text-center max-w-[80vw] mx-auto tracking-tight leading-none transition-all duration-500
+              ${showContent ? 'opacity-0 h-0 overflow-hidden mt-0' : 'opacity-100 mt-8'}
+            `}
+            style={{ 
+              fontFamily: "SF Pro, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+              letterSpacing: "-3.48px"
+            }}
+          >
+             Battle against your peers for your next j*b
+          </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-               <Bot className="w-6 h-6 text-indigo-500" />
-               Create Room
-            </CardTitle>
-            <CardDescription>Start a new session.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Display Name</label>
-              <Input 
-                placeholder="Enter your name" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-              />
+      {/* Main Content (3 Cards) */}
+      <div className={`w-full max-w-7xl transition-all duration-1000 ease-out transform z-10 
+        ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}
+      `}>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center pt-32 pb-20 px-4 max-w-6xl mx-auto">
+            
+            {/* 1. Create a Room (Orange) - Tilted Left */}
+            <div className="relative group perspective-1000 transform -rotate-3 md:-rotate-6 translate-y-12 hover:z-20 hover:scale-105 transition-all duration-300">
+                <div className="flex flex-col h-full bg-white border-4 border-[#FF8B66] rounded-xl p-4 shadow-xl">
+                     <div className="relative w-full aspect-square mb-4">
+                        <Image src={CreateRoomImage} alt="Create Room" fill className="object-contain" />
+                     </div>
+                     <h2 className="text-4xl font-bold text-[#D65F3B] mb-4 tracking-tight leading-none">Create a Room</h2>
+                     
+                     <div className="mt-auto space-y-4">
+                         <div>
+                             <label className="block text-[#D65F3B] font-bold text-sm mb-1 ml-1">Display Name</label>
+                             <div className="bg-[#FFE5DE] p-1 rounded-lg">
+                                 <input 
+                                    className="w-full bg-transparent border-none outline-none text-xl p-2 font-bold text-[#D65F3B] placeholder-[#D65F3B]/50"
+                                    placeholder=""
+                                    value={createName}
+                                    onChange={e => setCreateName(e.target.value)}
+                                 />
+                             </div>
+                         </div>
+                         <button 
+                            onClick={handleCreate}
+                            disabled={!createName.trim()}
+                            className="w-full py-3 rounded-full border-2 border-[#FF8B66] text-[#D65F3B] font-bold text-xl hover:bg-[#FF8B66] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                         >
+                             Create
+                         </button>
+                     </div>
+                </div>
             </div>
-            <Button className="w-full" onClick={handleCreate} disabled={!name.trim()}>
-              Create & Enter
-            </Button>
-          </CardContent>
-        </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="w-6 h-6 text-emerald-500" />
-              Join Room
-            </CardTitle>
-            <CardDescription>Enter an existing room code.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Display Name</label>
-              <Input 
-                placeholder="Enter your name" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-              />
+            {/* 2. Join a Friend (Green) - Center / Straight */}
+            <div className="relative group perspective-1000 z-10 hover:scale-105 transition-all duration-300">
+                 <div className="flex flex-col h-full bg-white border-4 border-[#6BCB77] rounded-xl p-4 shadow-xl">
+                     <div className="relative w-full aspect-square mb-4">
+                        <Image src={JoinFriendImage} alt="Join Friend" fill className="object-contain" />
+                     </div>
+                     <h2 className="text-4xl font-bold text-[#4CAF50] mb-4 tracking-tight leading-none">Join a Friend</h2>
+                     
+                     <div className="mt-auto space-y-4">
+                         <div>
+                             <label className="block text-[#4CAF50] font-bold text-sm mb-1 ml-1">Display Name</label>
+                             <div className="bg-[#E8F5E9] p-1 rounded-lg">
+                                 <input 
+                                    className="w-full bg-transparent border-none outline-none text-xl p-2 font-bold text-[#4CAF50] placeholder-[#4CAF50]/50"
+                                    placeholder=""
+                                    value={joinName}
+                                    onChange={e => setJoinName(e.target.value)}
+                                 />
+                             </div>
+                         </div>
+                         <div>
+                             <label className="block text-[#4CAF50] font-bold text-sm mb-1 ml-1">Room Code</label>
+                             <div className="border-2 border-[#6BCB77] p-1 rounded-lg">
+                                 <input 
+                                    className="w-full bg-transparent border-none outline-none text-xl p-2 font-bold text-[#4CAF50] placeholder-[#4CAF50]/50 uppercase tracking-widest font-mono"
+                                    placeholder="AXBDWE"
+                                    maxLength={6}
+                                    value={roomCode}
+                                    onChange={e => setRoomCode(e.target.value.toUpperCase())}
+                                 />
+                             </div>
+                         </div>
+                         <button 
+                            onClick={handleJoin}
+                            disabled={!joinName.trim() || !roomCode.trim()}
+                            className="w-full py-3 rounded-full border-2 border-[#6BCB77] text-[#4CAF50] font-bold text-xl hover:bg-[#6BCB77] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                         >
+                             Enter
+                         </button>
+                     </div>
+                </div>
             </div>
-            <div className="space-y-2">
-               <label className="text-sm font-medium">Room Code</label>
-               <Input 
-                 placeholder="ABCXYZ" 
-                 value={roomCode} 
-                 onChange={(e) => setRoomCode(e.target.value.toUpperCase())} 
-                 maxLength={6}
-               />
+
+            {/* 3. Solo Queue (Blue) - Tilted Right */}
+            <div className="relative group perspective-1000 transform rotate-3 md:rotate-6 translate-y-12 hover:z-20 hover:scale-105 transition-all duration-300">
+                <div className="flex flex-col h-full bg-white border-4 border-[#4D96FF] rounded-xl p-4 shadow-xl">
+                     <div className="relative w-full aspect-square mb-4">
+                        <Image src={SoloQueueImage} alt="Solo Queue" fill className="object-contain" />
+                     </div>
+                     <h2 className="text-4xl font-bold text-[#2196F3] mb-2 tracking-tight leading-none">Solo Queue</h2>
+                     
+                     <div className="mt-auto space-y-4">
+                         <div>
+                             <label className="block text-[#2196F3] font-bold text-sm mb-1 ml-1">Display Name</label>
+                             <div className="bg-[#E3F2FD] p-1 rounded-lg">
+                                 <input 
+                                    className="w-full bg-transparent border-none outline-none text-xl p-2 font-bold text-[#2196F3] placeholder-[#2196F3]/50"
+                                    placeholder=""
+                                    value={soloName}
+                                    onChange={e => setSoloName(e.target.value)}
+                                 />
+                             </div>
+                         </div>
+
+                         <div className="bg-blue-50/50 p-2 rounded text-xs font-medium text-[#2196F3] leading-tight">
+                            <span className="bg-[#2196F3] text-white px-1 rounded text-[10px] mr-1 uppercase">warning</span>
+                            might lose against your future co-workers and opponents..?!
+                         </div>
+
+                         <button 
+                            onClick={handleSolo}
+                            disabled={!soloName.trim()}
+                            className="w-full py-3 rounded-full border-2 border-[#4D96FF] text-[#2196F3] font-bold text-xl hover:bg-[#4D96FF] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                         >
+                             Join
+                         </button>
+                     </div>
+                </div>
             </div>
-            <Button className="w-full" variant="secondary" onClick={handleJoin} disabled={!name.trim() || !roomCode.trim()}>
-              Join Room
-            </Button>
-          </CardContent>
-        </Card>
+
+          </div>
       </div>
     </main>
   );

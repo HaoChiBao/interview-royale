@@ -14,6 +14,7 @@ export interface Player {
   lastVideoFrame?: string; // base64 data URI
   x?: number;
   y?: number;
+  isLeader?: boolean;
 }
 
 export interface Question {

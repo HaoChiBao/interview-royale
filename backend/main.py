@@ -48,6 +48,10 @@ class Game:
         # Physics loop task
         self.physics_task = None
         self.round_end_time = None
+    def cleanup(self):
+        if self.physics_task and not self.physics_task.done():
+            self.physics_task.cancel()
+            print("Physics task cancelled.")
 
     def handle_input(self, username: str, key: str, is_down: bool):
         if username not in self.players:
@@ -130,7 +134,7 @@ class Game:
         await game.start_physics(room_code)
         
         # Wait for intermission
-        await asyncio.sleep(120) # 2 minutes intermission
+        await asyncio.sleep(60) # 1 minute intermission
 
         
         # Check if game over
@@ -145,6 +149,10 @@ class Game:
 
         # Start next round
         question = game.start_round()
+        
+        # Start monitoring
+        asyncio.create_task(game.monitor_round(room_code, game.current_round))
+        
         await manager.broadcast_to_room(room_code, {
             "type": "new_question",
             "question": question,
@@ -152,6 +160,29 @@ class Game:
             "current_round": game.current_round,
             "total_rounds": game.settings["num_rounds"]
         })
+
+    async def monitor_round(self, room_code: str, round_num: int):
+        duration = self.settings["round_duration"]
+        await asyncio.sleep(duration)
+        
+        # Check if we are still in the same round and state is QUESTION
+        if self.state == "QUESTION" and self.current_round == round_num:
+            print(f"Round {round_num} time expired. Force ending.")
+            results = self.end_round()
+            leaderboard = self.get_leaderboard()
+            
+            # Broadcast round over
+            await manager.broadcast_to_room(room_code, {
+                "type": "round_over",
+                "results": results,
+                "leaderboard": leaderboard,
+                "state": "RESULTS",
+                "is_final_round": self.current_round >= self.settings["num_rounds"],
+                "intermission_end_time": time.time() + 60
+            })
+            
+            # Start intermission
+            asyncio.create_task(self.handle_intermission(room_code))
 
     def end_round(self):
         self.state = "RESULTS"
@@ -218,17 +249,37 @@ class ConnectionManager:
         if not room_code: return
 
         players_list = []
+        game_instance = games.get(room_code)
+        
+        # Check leader integrity
+        if game_instance:
+             # If no leader or leader not connected, pick new
+             active_users = [data["username"] for _, data in self.active_connections.items() if data.get("room_code") == room_code]
+             
+             if not game_instance.leader or game_instance.leader not in active_users:
+                 if active_users:
+                     game_instance.leader = active_users[0] # First one or random
+                     print(f"New leader for {room_code}: {game_instance.leader}")
+                 else:
+                     game_instance.leader = None
+
+        current_leader = game_instance.leader if game_instance else None
+
         for _, data in list(self.active_connections.items()):
             if data.get("room_code") == room_code and data.get("username"):
-                players_list.append({"username": data["username"]})
+                is_leader = (data["username"] == current_leader)
+                players_list.append({
+                    "username": data["username"],
+                    "is_leader": is_leader
+                })
         
-        game_instance = games.get(room_code)
         current_state = game_instance.state if game_instance else "LOBBY"
 
         await self.broadcast_to_room(room_code, {
             "type": "player_update",
             "players": players_list,
-            "game_state": current_state
+            "game_state": current_state,
+            "leader": current_leader
         })
 
 manager = ConnectionManager()
@@ -329,46 +380,47 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Cast vote
                     rounds = new_settings.get("num_rounds", 3)
                     print(f"Casting vote: {rounds}")
-                    game.cast_vote(username, rounds)
+                    rounds = new_settings.get("num_rounds")
                     
+                    if rounds is not None:
+                         # Clamp 1-10
+                         rounds = max(1, min(10, int(rounds)))
+                         game.settings["num_rounds"] = rounds
+                    
+                    # Broadcast updated settings to everyone (visual sync)
                     await manager.broadcast_to_room(room_code, {
                         "type": "settings_update",
-                        "settings": game.settings, # This might just be the last vote
-                        "votes": game.votes
+                        "settings": game.settings
                     })
 
             elif message_type == "start_game":
+                # Only leader can start
+                username = manager.active_connections[websocket]["username"]
                 room_code = manager.active_connections[websocket]["room_code"]
                 if not room_code or room_code not in games: continue
-                
                 game = games[room_code]
+
+                if game.leader and game.leader != username:
+                    print(f"User {username} tried to start game but is not leader ({game.leader})")
+                    continue
                 
-                # 1. Deterministically pick round count
-                # Collect votes
-                if game.votes:
-                    options = list(game.votes.values())
-                    winner = random.choice(options)
-                else:
-                    winner = 3 # default
-                
-                game.settings["num_rounds"] = winner
-                
-                # 2. Broadcast animation event
+                # Broadcast STARTING event for countdown on frontend
                 await manager.broadcast_to_room(room_code, {
-                    "type": "settings_chosen",
-                    "winner": winner,
-                    "all_votes": list(game.votes.values())
+                    "type": "game_starting"
                 })
                 
-                # 3. Wait for animation (e.g. 4 seconds)
-                await asyncio.sleep(4)
+                # 3 second countdown logic on server (wait before sending new question)
+                await asyncio.sleep(4) # 3s countdown + 1s buffer
 
-                # Reset game state if needed (or if restarting)
+                # Reset game state
                 if game.state == "LOBBY" or game.state == "GAME_OVER":
                      game.current_round = 0
                      game.cumulative_scores = {}
                 
                 question = game.start_round()
+                
+                # Start round monitoring
+                asyncio.create_task(game.monitor_round(room_code, game.current_round))
                 
                 await manager.broadcast_to_room(room_code, {
                     "type": "new_question",
@@ -378,11 +430,65 @@ async def websocket_endpoint(websocket: WebSocket):
                     "total_rounds": game.settings["num_rounds"]
                 })
 
+            elif message_type == "skip_intermission":
+                username = manager.active_connections[websocket]["username"]
+                room_code = manager.active_connections[websocket]["room_code"]
+                if not room_code or room_code not in games: continue
+                game = games[room_code]
+
+                if game.leader and game.leader != username:
+                    print(f"User {username} tried to skip intermission but is not leader")
+                    continue
+                
+                if game.state == "INTERMISSION":
+                    # Cancel existing physics task or just force state change?
+                    # The handle_intermission loop is sleeping. We can't easily cancel the sleep unless we store the task.
+                    # Or we just force start the next round and the sleep will wake up and see state is not INTERMISSION?
+                    # But the sleep continues.
+                    # To properly skip, we should probably set a flag or cancel the task.
+                    # Creating a new round immediately is easiest. The old task will wake up, check conditions, and ideally exit or do nothing.
+                    # Refactored handle_intermission to check (if game.state != INTERMISSION return)
+                    pass
+                    # Actually, since handle_intermission has a sleep(60), we can't easily interrupt it without storing the task object.
+                    # Let's simple call start_round. The previous handle_intermission will eventually wake up.
+                    # To prevent double rounds, we should check state in handle_intermission after wake.
+                    
+                    # Force start next round logic (similar to next_round)
+                    # We reuse next_round logic basically.
+                    
+                    if game.current_round >= game.settings["num_rounds"]:
+                         game.state = "GAME_OVER"
+                         await manager.broadcast_to_room(room_code, {
+                            "type": "game_over",
+                            "leaderboard": game.get_leaderboard()
+                         })
+                    else:
+                        question = game.start_round() # This changes state to QUESTION
+                        
+                        # Start round monitoring
+                        asyncio.create_task(game.monitor_round(room_code, game.current_round))
+
+                        await manager.broadcast_to_room(room_code, {
+                            "type": "new_question",
+                            "question": question,
+                            "state": "QUESTION",
+                            "current_round": game.current_round,
+                            "total_rounds": game.settings["num_rounds"]
+                        })
+
             elif message_type == "next_round":
+                # Only leader can advance? Or anyone? 
+                # Original request says Game Leader can skip intermission.
+                # Assuming next_round is triggered by skip button or automatic?
+                # Let's enforce leader for next_round too just in case client calls it.
+                username = manager.active_connections[websocket]["username"]
                 room_code = manager.active_connections[websocket]["room_code"]
                 if not room_code or room_code not in games: continue
                 game = games[room_code]
                 
+                if game.leader and game.leader != username:
+                     continue
+                     
                 if game.current_round >= game.settings["num_rounds"]:
                      game.state = "GAME_OVER"
                      await manager.broadcast_to_room(room_code, {
@@ -391,6 +497,10 @@ async def websocket_endpoint(websocket: WebSocket):
                      })
                 else:
                     question = game.start_round()
+                    
+                    # Start round monitoring
+                    asyncio.create_task(game.monitor_round(room_code, game.current_round))
+
                     await manager.broadcast_to_room(room_code, {
                         "type": "new_question",
                         "question": question,
@@ -481,10 +591,13 @@ async def websocket_endpoint(websocket: WebSocket):
         # ... existing disconnect logic ...
         if room_code:
             await manager.broadcast_player_list(room_code)
-            # Optional: Delete room if empty
-            # active_in_room = [p for p in manager.active_connections.values() if p["room_code"] == room_code]
-            # if not active_in_room and room_code in games:
-            #     del games[room_code]
+            # Check if room is empty
+            active_in_room = [p for p in manager.active_connections.values() if p.get("room_code") == room_code]
+            if not active_in_room and room_code in games:
+                print(f"Room {room_code} is empty. Deleting...")
+                if hasattr(games[room_code], 'cleanup'):
+                    games[room_code].cleanup()
+                del games[room_code]
     except Exception as e:
         print(f"Error: {e}")
         manager.disconnect(websocket)

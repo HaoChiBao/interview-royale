@@ -9,6 +9,7 @@ interface AvatarStickFigureProps {
   className?: string;
   seed?: string; // For bot randomization if needed
   lastVideoFrame?: string;
+  isLeader?: boolean;
 }
 
 export function AvatarStickFigure({
@@ -18,6 +19,7 @@ export function AvatarStickFigure({
   cameraEnabled,
   className,
   lastVideoFrame,
+  isLeader,
 }: AvatarStickFigureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -31,6 +33,11 @@ export function AvatarStickFigure({
 
   return (
     <div className={cn("relative flex flex-col items-center", className)}>
+      {/* Crown for Leader */}
+      {isLeader && (
+         <div className="absolute -top-8 text-3xl animate-bounce">👑</div>
+      )}
+
       {/* Head */}
       <div className="relative w-24 h-24 mb-[-10px] z-10">
         {isMe && cameraEnabled && stream ? (
@@ -78,7 +85,7 @@ export function AvatarStickFigure({
       </svg>
       
       {/* Name Label */}
-      <div className="mt-2 bg-black/80 text-white text-xs px-2 py-1 rounded-full">
+      <div className="mt-2 bg-black/80 text-white text-xs px-2 py-1 rounded-full flex gap-1 items-center">
         {name} {isMe ? "(You)" : ""}
       </div>
     </div>

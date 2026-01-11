@@ -154,10 +154,12 @@ export default function ResultsPage() {
                             </span>
                         </div>
                         {/* Optional manual override for host or testing */}
-                         {/* <Button size="lg" className="w-full text-lg shadow-lg shadow-indigo-500/20" onClick={handleNextRound}>
-                            Next Round Immediately
-                            <ArrowRight className="w-5 h-5 ml-2" />
-                        </Button> */}
+                         {me?.isLeader && (
+                             <Button size="lg" className="w-full text-lg shadow-lg shadow-indigo-500/20" onClick={() => socketClient.send("skip_intermission", {})}>
+                                 Skip Intermission 👑
+                                 <ArrowRight className="w-5 h-5 ml-2" />
+                             </Button>
+                         )}
                     </div>
                 )}
              </div>

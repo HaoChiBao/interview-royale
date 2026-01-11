@@ -28,6 +28,7 @@ export default function LobbyPage() {
   const votes = useGameStore(s => s.votes);
   const isChoosingSettings = useGameStore(s => s.isChoosingSettings);
   const chosenSettings = useGameStore(s => s.chosenSettings);
+  const isStarting = useGameStore(s => s.isStarting);
 
   const [spinResult, setSpinResult] = useState<number | null>(null);
 
@@ -94,6 +95,7 @@ export default function LobbyPage() {
     }, [code]);
 
   const updateSettings = (partial: { num_rounds?: number }) => {
+      console.log("Button clicked. updateSettings:", partial);
       // Logic constraint: 1-5
       if (partial.num_rounds !== undefined) {
           if (partial.num_rounds < 1) partial.num_rounds = 1;
@@ -133,6 +135,11 @@ export default function LobbyPage() {
               <p className="mt-8 text-xl opacity-80">Randomly selected from player votes!</p>
           </div>
       )}
+      
+      {/* 3..2..1 START Countdown Overlay */}
+      {isStarting && (
+          <CountdownOverlay />
+      )}
 
       <header className="flex justify-between items-center mb-8">
         <div>
@@ -149,60 +156,91 @@ export default function LobbyPage() {
         </div>
       </header>
 
-      <section className="flex-1 overflow-y-auto mb-8">
-        <PlayerGrid localStream={localStream} />
+      <section className="flex-1 w-full relative">
+         <div className="absolute inset-0 pb-40">
+            <PlayerGrid localStream={localStream} />
+         </div>
       </section>
 
-      <footer className="flex justify-center flex-col items-center gap-4 py-8 border-t bg-gray-50 p-4 rounded-xl shadow-sm">
-        <div className="flex flex-col md:flex-row gap-8 items-center w-full max-w-4xl">
+      <footer className="fixed bottom-0 left-0 right-0 z-20 flex justify-center flex-col items-center gap-4 py-6 bg-white/20 backdrop-blur-xl border-t border-white/20 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+        <div className="flex flex-col md:flex-row gap-8 items-center w-full max-w-4xl px-4">
            
            {/* Game Settings Card - High Contrast */}
             <div className="bg-white border-2 border-zinc-200 p-6 rounded-xl flex-1 w-full shadow-lg">
-                <h3 className="font-bold text-sm uppercase text-zinc-500 mb-4 tracking-wider">Your Vote</h3>
+                <h3 className="font-bold text-sm uppercase text-zinc-500 mb-4 tracking-wider">Game Settings</h3>
                 <div className="flex items-center justify-between">
                     <span className="font-medium text-lg">Number of Rounds</span>
                     <div className="flex items-center gap-3">
-                        <Button 
-                        variant="outline" size="icon" className="h-10 w-10 rounded-full border-2"
-                        onClick={() => updateSettings({ num_rounds: myVote - 1 })}
-                        disabled={isChoosingSettings}
-                        > - </Button>
-                        <span className="w-12 text-center font-black text-3xl">{myVote}</span>
-                        <Button 
-                        variant="outline" size="icon" className="h-10 w-10 rounded-full border-2"
-                        onClick={() => updateSettings({ num_rounds: myVote + 1 })}
-                        disabled={isChoosingSettings}
-                        > + </Button>
+                        {me?.isLeader ? (
+                             <>
+                                <Button 
+                                variant="outline" size="icon" className="h-10 w-10 rounded-full border-2"
+                                onClick={() => updateSettings({ num_rounds: gameSettings.num_rounds - 1 })}
+                                disabled={isChoosingSettings || useGameStore.getState().isStarting}
+                                > - </Button>
+                                <span className="w-12 text-center font-black text-3xl">{gameSettings.num_rounds}</span>
+                                <Button 
+                                variant="outline" size="icon" className="h-10 w-10 rounded-full border-2"
+                                onClick={() => updateSettings({ num_rounds: gameSettings.num_rounds + 1 })}
+                                disabled={isChoosingSettings || useGameStore.getState().isStarting}
+                                > + </Button>
+                             </>
+                        ) : (
+                             <span className="w-12 text-center font-black text-3xl text-zinc-400">{gameSettings.num_rounds}</span>
+                        )}
                     </div>
                 </div>
-                <p className="text-xs text-zinc-400 mt-4 text-center">
-                    Game will randomly select a vote from all players.
-                </p>
-                <div className="mt-4 flex gap-1 justify-center h-2">
-                    {Object.values(votes || {}).map((v, i) => (
-                        <div key={i} className="w-2 h-2 rounded-full bg-indigo-500/50" title={`Vote: ${v}`} />
-                    ))}
-                </div>
+                {!me?.isLeader && (
+                    <p className="text-xs text-zinc-400 mt-4 text-center">
+                        Only the leader can change settings.
+                    </p>
+                )}
             </div>
 
             {/* Start Button Area */}
+            {/* Start Button Area - Only Leader */}
             <div className="flex-1 w-full flex flex-col items-center justify-center gap-4">
-                 <div className="text-sm text-zinc-500">
-                    Waiting for host to start... 
-                 </div>
-                <Button 
-                    size="lg" 
-                    className="w-full max-w-sm font-bold text-xl h-16 shadow-xl shadow-indigo-500/20 rounded-2xl transition-all hover:scale-105 active:scale-95"
-                    onClick={handleStart}
-                    disabled={isChoosingSettings} 
-                >
-                    <Play className="w-6 h-6 mr-2 fill-current" />
-                    {isChoosingSettings ? "Rolling..." : "Start Game"}
-                </Button>
+                 {me?.isLeader ? (
+                     <Button 
+                        size="lg" 
+                        className="w-full max-w-sm font-bold text-xl h-16 shadow-xl shadow-indigo-500/20 rounded-2xl transition-all hover:scale-105 active:scale-95"
+                        onClick={handleStart}
+                        disabled={isChoosingSettings || useGameStore.getState().isStarting} 
+                    >
+                        <Play className="w-6 h-6 mr-2 fill-current" />
+                        {useGameStore.getState().isStarting ? "Starting..." : "Start Game"}
+                    </Button>
+                 ) : (
+                     <div className="text-center p-4 bg-zinc-100 rounded-lg text-zinc-500 font-medium">
+                        Waiting for leader to start...
+                     </div>
+                 )}
             </div>
 
         </div>
       </footer>
     </main>
   );
+}
+
+function CountdownOverlay() {
+    const [count, setCount] = useState(3);
+    
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCount(prev => prev > 1 ? prev - 1 : 1);
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="absolute inset-0 z-[60] bg-black/90 flex flex-col items-center justify-center text-white backdrop-blur-md animate-in fade-in duration-300">
+              <div className="text-[200px] font-black animate-pulse leading-none bg-gradient-to-b from-indigo-400 to-purple-600 bg-clip-text text-transparent">
+                  {count}
+              </div>
+              <h2 className="text-3xl font-bold mt-8 text-zinc-300 animate-bounce">
+                  Prepare for the interview...
+              </h2>
+        </div>
+    );
 }

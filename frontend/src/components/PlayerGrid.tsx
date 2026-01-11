@@ -26,6 +26,7 @@ export function PlayerGrid({ localStream }: PlayerGridProps) {
              stream={player.isMe ? localStream : undefined}
              cameraEnabled={player.cameraEnabled}
              lastVideoFrame={player.lastVideoFrame}
+             isLeader={player.isLeader}
            />
         </div>
       ))}
