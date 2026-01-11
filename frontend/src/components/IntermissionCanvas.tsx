@@ -219,15 +219,15 @@ export function IntermissionCanvas() {
 
     return (
         <div className="fixed inset-0 z-50 bg-[#F0F0F0] overflow-hidden">
-            {/* Infinite Tiled Background via CSS */}
-            <div
-                className="absolute inset-0 pointer-events-none opacity-30"
-                style={{
-                    backgroundImage: "linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)",
-                    backgroundSize: "40px 40px",
-                    backgroundPosition: `${camOffsetX}px ${camOffsetY}px`
-                }}
-            />
+             {/* Grid Background */}
+             <div className="absolute inset-0 opacity-10 pointer-events-none" 
+                  style={{ 
+                      backgroundImage: "linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)", 
+                      backgroundSize: "50px 50px",
+                      // Move background opposite to player movement (or rather, fixed to world space)
+                      backgroundPosition: `${camOffsetX}px ${camOffsetY}px` 
+                  }} 
+             />
 
             <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-white/90 px-6 py-2 rounded-full shadow-lg border border-blue-100 z-50 flex flex-col items-center">
                 <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">
