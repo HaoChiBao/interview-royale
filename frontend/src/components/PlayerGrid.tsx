@@ -12,22 +12,22 @@ interface PlayerGridProps {
 export function PlayerGrid({ localStream }: PlayerGridProps) {
   const me = useGameStore((state) => state.me);
   const others = useGameStore((state) => state.others);
-  
+
   // Combine all players
   const allPlayers = me ? [me, ...others] : others;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 p-4 w-full max-w-6xl mx-auto">
-      {allPlayers.map((player) => (
-        <div key={player.id} className="flex justify-center">
-           <AvatarStickFigure
-             name={player.name}
-             isMe={player.isMe}
-             stream={player.isMe ? localStream : undefined}
-             cameraEnabled={player.cameraEnabled}
-             lastVideoFrame={player.lastVideoFrame}
-             isLeader={player.isLeader}
-           />
+      {allPlayers.map((player, i) => (
+        <div key={player.id || i} className="flex justify-center">
+          <AvatarStickFigure
+            name={player.name}
+            isMe={player.isMe}
+            stream={player.isMe ? localStream : undefined}
+            cameraEnabled={player.cameraEnabled}
+            lastVideoFrame={player.lastVideoFrame}
+            isLeader={player.isLeader}
+          />
         </div>
       ))}
     </div>

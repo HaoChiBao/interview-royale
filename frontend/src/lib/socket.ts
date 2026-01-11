@@ -4,24 +4,24 @@ import { useGameStore } from "@/store/useGameStore";
 class GameSocket {
   private socket: WebSocket | null = null;
 
-//   private getWebSocketUrl(): string {
-//     console.log("[Socket] Env Check:", {
-//       WS: process.env.NEXT_PUBLIC_WS_URL,
-//       API: process.env.NEXT_PUBLIC_API_URL
-//     });
+  //   private getWebSocketUrl(): string {
+  //     console.log("[Socket] Env Check:", {
+  //       WS: process.env.NEXT_PUBLIC_WS_URL,
+  //       API: process.env.NEXT_PUBLIC_API_URL
+  //     });
 
-//     if (process.env.NEXT_PUBLIC_WS_URL) {
-//       // Ensure it ends with /ws if not present
-//       const url = process.env.NEXT_PUBLIC_WS_URL;
-//       return url.endsWith("/ws") ? url : url + "/ws";
-//     }
-    
-//     // Fallback: derive from API URL
-//     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-//     const wsProtocol = apiUrl.startsWith("https") ? "wss" : "ws";
-//     const wsUrl = apiUrl.replace(/^https?/, wsProtocol);
-//     return wsUrl + "/ws";
-//   }
+  //     if (process.env.NEXT_PUBLIC_WS_URL) {
+  //       // Ensure it ends with /ws if not present
+  //       const url = process.env.NEXT_PUBLIC_WS_URL;
+  //       return url.endsWith("/ws") ? url : url + "/ws";
+  //     }
+
+  //     // Fallback: derive from API URL
+  //     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  //     const wsProtocol = apiUrl.startsWith("https") ? "wss" : "ws";
+  //     const wsUrl = apiUrl.replace(/^https?/, wsProtocol);
+  //     return wsUrl + "/ws";
+  //   }
 
   // private url: string = 'wss://interview-royale-production.up.railway.app/ws';
   private url: string = 'ws://localhost:8000/ws';
@@ -46,12 +46,15 @@ class GameSocket {
       try {
         const data = JSON.parse(event.data);
         const { debugLogState, handleServerMessage } = useGameStore.getState();
-        
+
         if (debugLogState) {
           console.log("[WS IN]", data);
         }
-        
+
         handleServerMessage(data);
+
+        // Dispatch raw event for non-store subscribers (e.g. AudioChat)
+        window.dispatchEvent(new CustomEvent("game_socket_message", { detail: data }));
       } catch (e) {
         console.error("WS Parse Error", e);
       }
@@ -84,7 +87,7 @@ class GameSocket {
     if (debugLogState) {
       console.log("[WS OUT]", msg);
     }
-    
+
     const msgStr = JSON.stringify(msg);
 
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
@@ -109,10 +112,10 @@ class GameSocket {
   }
 
   sendVideoFrame(frame: string) {
-      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-          // Bypass debug log for video frames to avoid spam
-          this.socket.send(JSON.stringify({ type: "video_update", frame }));
-      }
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      // Bypass debug log for video frames to avoid spam
+      this.socket.send(JSON.stringify({ type: "video_update", frame }));
+    }
   }
 }
 

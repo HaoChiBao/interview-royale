@@ -634,6 +634,18 @@ async def websocket_endpoint(websocket: WebSocket):
                         "frame": frame_data
                     })
 
+            elif message_type == "audio_update":
+                user_id = manager.active_connections[websocket]["user_id"]
+                room_code = manager.active_connections[websocket]["room_code"]
+                chunk = data.get("chunk")
+                
+                if room_code:
+                     await manager.broadcast_to_room(room_code, {
+                        "type": "audio_update",
+                        "id": user_id,
+                        "chunk": chunk
+                     })
+
             elif message_type == "keydown":
                 user_id = manager.active_connections[websocket]["user_id"]
                 room_code = manager.active_connections[websocket]["room_code"]
