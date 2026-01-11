@@ -23,7 +23,8 @@ app.add_middleware(
 import time
 
 class PlayerState:
-    def __init__(self, x=400, y=300):
+    def __init__(self, username, x=400, y=300):
+        self.username = username
         self.x = x
         self.y = y
         self.keys = {"w": False, "a": False, "s": False, "d": False}
@@ -33,33 +34,34 @@ class Game:
     def __init__(self):
         self.state = "LOBBY"
         self.current_question = None
-        self.submissions = {} # {username: {submission: ..., score: ...}}
-        self.players = {} # {username: PlayerState}
+        self.submissions = {} # {user_id: {submission: ..., score: ...}}
+        self.players = {} # {user_id: PlayerState}
         
         # New Settings
         self.settings = {
             "num_rounds": 3,
             "round_duration": 60
         }
-        self.votes = {} # {username: num_rounds}
+        self.votes = {} # {user_id: num_rounds}
         self.current_round = 0
-        self.cumulative_scores = {} # {username: int}
+        self.cumulative_scores = {} # {user_id: int}
         
         # Physics loop task
         self.physics_task = None
         self.round_end_time = None
+        self.leader = None # Store user_id of the leader
     def cleanup(self):
         if self.physics_task and not self.physics_task.done():
             self.physics_task.cancel()
             print("Physics task cancelled.")
 
-    def handle_input(self, username: str, key: str, is_down: bool):
-        if username not in self.players:
-            self.players[username] = PlayerState()
+    def handle_input(self, user_id: str, key: str, is_down: bool):
+        if user_id not in self.players:
+            return # Should exist
         
         key = key.lower()
-        if key in self.players[username].keys:
-            self.players[username].keys[key] = is_down
+        if key in self.players[user_id].keys:
+            self.players[user_id].keys[key] = is_down
 
     async def run_physics_loop(self, room_code: str):
         print(f"Starting physics loop for {room_code}")
@@ -72,7 +74,7 @@ class Game:
             start_time = time.time()
             
             state_snapshot = {}
-            for name, p in self.players.items():
+            for uid, p in self.players.items():
                 speed = 300 # pixels per second
                 dt = 0.05 # 50ms tick
                 
@@ -90,7 +92,7 @@ class Game:
                 # p.x = max(0, min(800, p.x))
                 # p.y = max(0, min(600, p.y))
                 
-                state_snapshot[name] = {"x": p.x, "y": p.y}
+                state_snapshot[uid] = {"x": p.x, "y": p.y, "username": p.username}
             
             if state_snapshot:
                 await manager.broadcast_to_room(room_code, {
@@ -108,8 +110,8 @@ class Game:
     def update_settings(self, settings: dict):
         self.settings.update(settings)
 
-    def cast_vote(self, username: str, num_rounds: int):
-        self.votes[username] = num_rounds
+    def cast_vote(self, user_id: str, num_rounds: int):
+        self.votes[user_id] = num_rounds
         # Update settings to reflect a "preview" or average? 
         # For now, we don't update self.settings until game start, 
         # but we might want to show the current "consensus" or just last vote?
@@ -190,13 +192,22 @@ class Game:
             return []
             
         # Update cumulative scores
-        for username, data in self.submissions.items():
+        for uid, data in self.submissions.items():
             score = data.get("score", 0)
-            self.cumulative_scores[username] = self.cumulative_scores.get(username, 0) + score
+            self.cumulative_scores[uid] = self.cumulative_scores.get(uid, 0) + score
             
         # Return round results sorted by score
+        # Need to include usernames? Or let frontend map it? 
+        # Ideally backend sends username too. We need to lookup username from players.
+        results = []
+        for uid, v in self.submissions.items():
+            if v.get("score") is not None:
+                p_state = self.players.get(uid)
+                u_name = p_state.username if p_state else "Unknown"
+                results.append({"user_id": uid, "username": u_name, **v})
+
         sorted_results = sorted(
-            [{"username": k, **v} for k, v in self.submissions.items() if v.get("score") is not None],
+            results,
             key=lambda x: x["score"],
             reverse=True
         )
@@ -204,8 +215,14 @@ class Game:
         
     def get_leaderboard(self):
         # Return cumulative leaderboard
+        lb = []
+        for uid, score in self.cumulative_scores.items():
+             p_state = self.players.get(uid)
+             u_name = p_state.username if p_state else "Unknown"
+             lb.append({"user_id": uid, "username": u_name, "score": score})
+
         return sorted(
-            [{"username": k, "score": v} for k, v in self.cumulative_scores.items()],
+            lb,
             key=lambda x: x["score"],
             reverse=True
         )
@@ -216,23 +233,24 @@ games: Dict[str, Game] = {}
 
 class ConnectionManager:
     def __init__(self):
-        # Key: WebSocket, Value: dict (player info: username, room_code)
+        # Key: WebSocket, Value: dict (player info: user_id, username, room_code)
         self.active_connections: Dict[WebSocket, dict] = {}
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         # Initial connection doesn't have metadata yet
-        self.active_connections[websocket] = {"username": None, "room_code": None}
+        self.active_connections[websocket] = {"user_id": None, "username": None, "room_code": None}
         print(f"Client connected. Total: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             data = self.active_connections[websocket]
-            username = data.get("username")
+            user_id = data.get("user_id")
             room_code = data.get("room_code")
             del self.active_connections[websocket]
-            print(f"Client {username} disconnected from room {room_code}. Total: {len(self.active_connections)}")
-            return room_code
+            print(f"Client {user_id} disconnected from room {room_code}. Total: {len(self.active_connections)}")
+            return room_code, user_id
+        return None, None
 
     async def broadcast_to_room(self, room_code: str, message: dict):
         if not room_code: return
@@ -253,12 +271,12 @@ class ConnectionManager:
         
         # Check leader integrity
         if game_instance:
-             # If no leader or leader not connected, pick new
-             active_users = [data["username"] for _, data in self.active_connections.items() if data.get("room_code") == room_code]
+             # active_users is now list of user_ids
+             active_ids = [data["user_id"] for _, data in self.active_connections.items() if data.get("room_code") == room_code and data.get("user_id")]
              
-             if not game_instance.leader or game_instance.leader not in active_users:
-                 if active_users:
-                     game_instance.leader = active_users[0] # First one or random
+             if not game_instance.leader or game_instance.leader not in active_ids:
+                 if active_ids:
+                     game_instance.leader = active_ids[0] # First one or random
                      print(f"New leader for {room_code}: {game_instance.leader}")
                  else:
                      game_instance.leader = None
@@ -266,9 +284,10 @@ class ConnectionManager:
         current_leader = game_instance.leader if game_instance else None
 
         for _, data in list(self.active_connections.items()):
-            if data.get("room_code") == room_code and data.get("username"):
-                is_leader = (data["username"] == current_leader)
+            if data.get("room_code") == room_code and data.get("user_id"):
+                is_leader = (data["user_id"] == current_leader)
                 players_list.append({
+                    "id": data["user_id"],
                     "username": data["username"],
                     "is_leader": is_leader
                 })
@@ -286,7 +305,27 @@ manager = ConnectionManager()
 
 @app.get("/")
 async def get():
-    return {"message": "Interview Royale Backend Running"}
+    all_games = {}
+    for code, game in games.items():
+        all_games[code] = {
+            "state": game.state,
+            "settings": game.settings,
+            "current_round": game.current_round,
+            "leader": getattr(game, 'leader', None),
+            "players": {
+                uid: {"x": p.x, "y": p.y, "keys": p.keys, "username": p.username} 
+                for uid, p in game.players.items()
+            },
+            "submissions_count": len(game.submissions),
+            "cumulative_scores": game.cumulative_scores,
+            "votes": game.votes
+        }
+    return {
+        "message": "Interview Royale Backend Running",
+        "active_rooms": len(games),
+        "total_connections": len(manager.active_connections),
+        "games": all_games
+    }
 
 import string
 import random
@@ -313,11 +352,21 @@ async def websocket_endpoint(websocket: WebSocket):
                     room_code = generate_room_code()
                 
                 games[room_code] = Game()
-                # Initialize creator's vote to default
-                games[room_code].votes[username] = 3
-                print(f"Created new room: {room_code}")
                 
-                manager.active_connections[websocket]["username"] = username
+                # Generate User ID for creator
+                user_id = f"Guest{random.randint(100, 999)}"
+                # Ensure user_id uniqueness? Ideally yes, but probability low for now. 
+                # Let's loop briefly
+                while user_id in games[room_code].players: # Empty at first but good practice
+                     user_id = f"Guest{random.randint(100, 999)}"
+
+                # Initialize creator's vote to default
+                games[room_code].votes[user_id] = 3
+                games[room_code].leader = user_id # Creator is leader
+                print(f"Created new room: {room_code} by {user_id} ({username})")
+                
+                manager.active_connections[websocket]["username"] = user_id # Force username to be GuestXXX
+                manager.active_connections[websocket]["user_id"] = user_id
                 manager.active_connections[websocket]["room_code"] = room_code
                 
                 # Notify creator (they need the room code to share)
@@ -326,6 +375,17 @@ async def websocket_endpoint(websocket: WebSocket):
                     "room_code": room_code
                 })
                 
+                # Add to game state immediately
+                games[room_code].players[user_id] = PlayerState(user_id) # Consistent naming
+
+                # Send welcome with confirmed name
+                await websocket.send_json({
+                    "type": "welcome",
+                    "id": user_id,
+                    "username": user_id,
+                    "room_code": room_code
+                })
+
                 await manager.broadcast_player_list(room_code)
 
             elif message_type == "join":
@@ -337,15 +397,39 @@ async def websocket_endpoint(websocket: WebSocket):
                     print(f"Room {room_code} not found, auto-creating...")
                     games[room_code] = Game()
 
-                manager.active_connections[websocket]["username"] = username
+                # Generate unique ID
+                # We do NOT rename username anymore. We generate a unique ID.
+                user_id = f"Guest{random.randint(100, 999)}"
+                # Ensure unique in room
+                active_ids = [d["user_id"] for d in manager.active_connections.values() if d.get("room_code") == room_code]
+                while user_id in active_ids:
+                    user_id = f"Guest{random.randint(100, 999)}"
+
+                manager.active_connections[websocket]["username"] = user_id # Force username to be GuestXXX
+                manager.active_connections[websocket]["user_id"] = user_id
                 manager.active_connections[websocket]["room_code"] = room_code
                 
-                print(f"Player {username} joined room {room_code}")
+                print(f"Player {username} -> {user_id} joined room {room_code}")
+
+                # Send welcome with assigned ID
+                await websocket.send_json({
+                    "type": "welcome",
+                    "id": user_id, 
+                    "username": user_id, # Consistent naming
+                    "room_code": room_code
+                })
                 
+                # Add to game state immediately using ID
+                if user_id not in games[room_code].players:
+                    games[room_code].players[user_id] = PlayerState(user_id)
+
                 # Send current settings to the new joiner
                 game = games[room_code]
+
                 # Default vote for new player?
-                game.votes[username] = 3
+                if user_id not in game.votes:
+                     game.votes[user_id] = 3
+                     
                 await websocket.send_json({
                     "type": "settings_update",
                     "settings": game.settings,
@@ -368,13 +452,12 @@ async def websocket_endpoint(websocket: WebSocket):
                     })
 
             elif message_type == "update_settings":
-                # {type: update_settings, settings: {num_rounds: 5}}
                 room_code = manager.active_connections[websocket]["room_code"]
-                username = manager.active_connections[websocket]["username"]
+                user_id = manager.active_connections[websocket]["user_id"]
                 if not room_code or room_code not in games: continue
                 
                 game = games[room_code]
-                print(f"Update settings: {username} in {room_code}. State: {game.state}")
+                print(f"Update settings: {user_id} in {room_code}. State: {game.state}")
                 if game.state == "LOBBY":
                     new_settings = data.get("settings", {})
                     # Cast vote
@@ -387,7 +470,7 @@ async def websocket_endpoint(websocket: WebSocket):
                          rounds = max(1, min(10, int(rounds)))
                          game.settings["num_rounds"] = rounds
                     
-                    # Broadcast updated settings to everyone (visual sync)
+                    # Broadcast updated settings
                     await manager.broadcast_to_room(room_code, {
                         "type": "settings_update",
                         "settings": game.settings
@@ -395,13 +478,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
             elif message_type == "start_game":
                 # Only leader can start
-                username = manager.active_connections[websocket]["username"]
+                user_id = manager.active_connections[websocket]["user_id"]
                 room_code = manager.active_connections[websocket]["room_code"]
                 if not room_code or room_code not in games: continue
                 game = games[room_code]
 
-                if game.leader and game.leader != username:
-                    print(f"User {username} tried to start game but is not leader ({game.leader})")
+                if game.leader and game.leader != user_id:
+                    print(f"User {user_id} tried to start game but is not leader ({game.leader})")
                     continue
                 
                 # Broadcast STARTING event for countdown on frontend
@@ -410,7 +493,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
                 
                 # 3 second countdown logic on server (wait before sending new question)
-                await asyncio.sleep(4) # 3s countdown + 1s buffer
+                await asyncio.sleep(4) 
 
                 # Reset game state
                 if game.state == "LOBBY" or game.state == "GAME_OVER":
@@ -431,31 +514,16 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
 
             elif message_type == "skip_intermission":
-                username = manager.active_connections[websocket]["username"]
+                user_id = manager.active_connections[websocket]["user_id"]
                 room_code = manager.active_connections[websocket]["room_code"]
                 if not room_code or room_code not in games: continue
                 game = games[room_code]
 
-                if game.leader and game.leader != username:
-                    print(f"User {username} tried to skip intermission but is not leader")
+                if game.leader and game.leader != user_id:
+                    print(f"User {user_id} tried to skip intermission but is not leader")
                     continue
                 
                 if game.state == "INTERMISSION":
-                    # Cancel existing physics task or just force state change?
-                    # The handle_intermission loop is sleeping. We can't easily cancel the sleep unless we store the task.
-                    # Or we just force start the next round and the sleep will wake up and see state is not INTERMISSION?
-                    # But the sleep continues.
-                    # To properly skip, we should probably set a flag or cancel the task.
-                    # Creating a new round immediately is easiest. The old task will wake up, check conditions, and ideally exit or do nothing.
-                    # Refactored handle_intermission to check (if game.state != INTERMISSION return)
-                    pass
-                    # Actually, since handle_intermission has a sleep(60), we can't easily interrupt it without storing the task object.
-                    # Let's simple call start_round. The previous handle_intermission will eventually wake up.
-                    # To prevent double rounds, we should check state in handle_intermission after wake.
-                    
-                    # Force start next round logic (similar to next_round)
-                    # We reuse next_round logic basically.
-                    
                     if game.current_round >= game.settings["num_rounds"]:
                          game.state = "GAME_OVER"
                          await manager.broadcast_to_room(room_code, {
@@ -477,16 +545,12 @@ async def websocket_endpoint(websocket: WebSocket):
                         })
 
             elif message_type == "next_round":
-                # Only leader can advance? Or anyone? 
-                # Original request says Game Leader can skip intermission.
-                # Assuming next_round is triggered by skip button or automatic?
-                # Let's enforce leader for next_round too just in case client calls it.
-                username = manager.active_connections[websocket]["username"]
+                user_id = manager.active_connections[websocket]["user_id"]
                 room_code = manager.active_connections[websocket]["room_code"]
                 if not room_code or room_code not in games: continue
                 game = games[room_code]
                 
-                if game.leader and game.leader != username:
+                if game.leader and game.leader != user_id:
                      continue
                      
                 if game.current_round >= game.settings["num_rounds"]:
@@ -514,14 +578,14 @@ async def websocket_endpoint(websocket: WebSocket):
                 if not room_code or room_code not in games: continue
                 
                 game = games[room_code]
-                username = manager.active_connections[websocket]["username"]
+                user_id = manager.active_connections[websocket]["user_id"]
                 submission_content = data.get("content")
                 
                 # Grade immediately
                 result = await grade_submission(submission_content, game.current_question)
                 
-                # Store result
-                game.submissions[username] = {
+                # Store result keyed by user_id
+                game.submissions[user_id] = {
                     "content": submission_content,
                     "score": result["score"],
                     "feedback": result["feedback"]
@@ -536,7 +600,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 # Check for round end
                 room_players_count = len([
                     p for p in manager.active_connections.values() 
-                    if p.get("room_code") == room_code and p.get("username")
+                    if p.get("room_code") == room_code and p.get("user_id")
                 ])
                 
                 if len(game.submissions) >= room_players_count:
@@ -549,51 +613,57 @@ async def websocket_endpoint(websocket: WebSocket):
                     await manager.broadcast_to_room(room_code, {
                         "type": "round_over",
                         "results": results,
-                        "leaderboard": leaderboard, # Cumulative
+                        "leaderboard": leaderboard,
                         "state": "RESULTS",
                         "is_final_round": game.current_round >= game.settings["num_rounds"],
                         "intermission_end_time": time.time() + 120
                     })
 
             elif message_type == "video_update":
-                # ... existing video logic ...
+                user_id = manager.active_connections[websocket]["user_id"]
                 username = manager.active_connections[websocket]["username"]
                 room_code = manager.active_connections[websocket]["room_code"]
                 frame_data = data.get("frame")
                 
                 if room_code:
+                    # Broadcast with ID
                     await manager.broadcast_to_room(room_code, {
                         "type": "video_update",
+                        "id": user_id,
                         "username": username,
                         "frame": frame_data
                     })
 
             elif message_type == "keydown":
-                # {type: keydown, key: "w"}
-                username = manager.active_connections[websocket]["username"]
+                user_id = manager.active_connections[websocket]["user_id"]
                 room_code = manager.active_connections[websocket]["room_code"]
                 key = data.get("key")
                 
                 if room_code and room_code in games:
-                    games[room_code].handle_input(username, key, is_down=True)
+                    games[room_code].handle_input(user_id, key, is_down=True)
 
             elif message_type == "keyup":
-                # {type: keyup, key: "w"}
-                username = manager.active_connections[websocket]["username"]
+                user_id = manager.active_connections[websocket]["user_id"]
                 room_code = manager.active_connections[websocket]["room_code"]
                 key = data.get("key")
                 
                 if room_code and room_code in games:
-                    games[room_code].handle_input(username, key, is_down=False)
+                    games[room_code].handle_input(user_id, key, is_down=False)
 
     except WebSocketDisconnect:
-        room_code = manager.disconnect(websocket)
-        # ... existing disconnect logic ...
+        # We need the user_id before disconnecting to remove from game state
+        room_code, user_id_removed = manager.disconnect(websocket)
+        
         if room_code:
+            # Sync game state
+            if room_code in games and user_id_removed:
+                 if user_id_removed in games[room_code].players:
+                     del games[room_code].players[user_id_removed]
+            
             await manager.broadcast_player_list(room_code)
             # Check if room is empty
-            active_in_room = [p for p in manager.active_connections.values() if p.get("room_code") == room_code]
-            if not active_in_room and room_code in games:
+            active_ids = [p["user_id"] for p in manager.active_connections.values() if p.get("room_code") == room_code]
+            if not active_ids and room_code in games:
                 print(f"Room {room_code} is empty. Deleting...")
                 if hasattr(games[room_code], 'cleanup'):
                     games[room_code].cleanup()

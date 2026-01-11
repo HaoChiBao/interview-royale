@@ -74,7 +74,13 @@ export default function LobbyPage() {
       const state = useGameStore.getState();
       let myName = state.me?.name;
       if (!myName) {
-        myName = "Guest" + Math.floor(Math.random() * 1000);
+        // Try local storage
+        const stored = localStorage.getItem("interview-royale-name");
+        if (stored) {
+            myName = stored;
+        } else {
+            myName = "Guest" + Math.floor(Math.random() * 1000);
+        }
         useGameStore.getState().setMe(myName);
       }
 

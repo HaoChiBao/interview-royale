@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useGameStore } from "@/store/useGameStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { AvatarStickFigure } from "@/components/AvatarStickFigure";
@@ -72,6 +73,9 @@ function PreflightContent() {
     // Stop local stream before navigating
     stream?.getTracks().forEach(t => t.stop());
     
+    // Set name in store
+    useGameStore.getState().setMe(name);
+
     router.push(`/room/${code}`);
   };
 

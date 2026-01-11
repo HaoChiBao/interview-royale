@@ -145,9 +145,9 @@ export function IntermissionCanvas() {
                      
                      // Snap if very close to avoid micro-jitter
                      if (Math.abs(newX - targetX) < 1 && Math.abs(newY - targetY) < 1) {
-                         nextState[p.name] = { x: targetX, y: targetY };
+                         nextState[p.id] = { x: targetX, y: targetY };
                      } else {
-                         nextState[p.name] = { x: newX, y: newY };
+                         nextState[p.id] = { x: newX, y: newY };
                      }
                 });
                 
@@ -174,7 +174,7 @@ export function IntermissionCanvas() {
     }, []);
 
     // Helper to get my current visual position
-    const myVisualPos = me && visualState[me.name] ? visualState[me.name] : { x: 400, y: 300 };
+    const myVisualPos = me && visualState[me.id] ? visualState[me.id] : { x: 400, y: 300 };
     
     // Calculate Camera Offset
     // We want 'myVisualPos' to be at center of screen
@@ -233,9 +233,9 @@ export function IntermissionCanvas() {
              </div> */}
 
              {/* Render Players */}
-             {Object.entries(visualState).map(([name, pos]) => {
-                 const isMe = me?.name === name;
-                 const player = isMe ? me : others.find(o => o.name === name);
+             {Object.entries(visualState).map(([id, pos]) => {
+                 const isMe = me?.id === id;
+                 const player = isMe ? me : others.find(o => o.id === id);
                  
                  // Only show if submitted (or if it's me)
                  if (!isMe && !player?.hasSubmitted) return null;
@@ -246,7 +246,7 @@ export function IntermissionCanvas() {
 
                  return (
                      <div 
-                        key={name}
+                        key={id}
                         className="absolute" 
                         style={{ 
                             transform: `translate(${screenX}px, ${screenY}px)`,
@@ -256,7 +256,7 @@ export function IntermissionCanvas() {
                         }}
                      >
                         <AvatarStickFigure
-                            name={name}
+                            name={player?.name || "Unknown"}
                             isMe={isMe}
                             stream={isMe ? stream : null}
                             cameraEnabled={true}
@@ -325,28 +325,28 @@ export function IntermissionCanvas() {
                               }} 
                          />
                          
-                         {minimapPlayers.map(p => {
-                             const v = visualState[p.name] || {x: p.x || 400, y: p.y || 300};
-                             const isMe = p.name === me?.name;
-                             
-                             // Normalize 0..1
-                             const nx = (v.x - minX) / finalW;
-                             const ny = (v.y - minY) / finalH;
-                             
-                             return (
-                                 <div 
-                                    key={p.name}
-                                    className={cn(
-                                        "absolute w-2 h-2 rounded-full -translate-x-1/2 -translate-y-1/2",
-                                        isMe ? "bg-green-500 z-10 w-2.5 h-2.5 ring-1 ring-white" : "bg-indigo-400"
-                                    )}
-                                    style={{
-                                        left: `${nx * 100}%`,
-                                        top: `${ny * 100}%`
-                                    }}
-                                 />
-                             );
-                         })}
+                          {minimapPlayers.map(p => {
+                              const v = visualState[p.id] || {x: p.x || 400, y: p.y || 300};
+                              const isMe = p.id === me?.id;
+                              
+                              // Normalize 0..1
+                              const nx = (v.x - minX) / finalW;
+                              const ny = (v.y - minY) / finalH;
+                              
+                              return (
+                                  <div 
+                                     key={p.id}
+                                     className={cn(
+                                         "absolute w-2 h-2 rounded-full -translate-x-1/2 -translate-y-1/2",
+                                         isMe ? "bg-green-500 z-10 w-2.5 h-2.5 ring-1 ring-white" : "bg-indigo-400"
+                                     )}
+                                     style={{
+                                         left: `${nx * 100}%`,
+                                         top: `${ny * 100}%`
+                                     }}
+                                  />
+                              );
+                          })}
                      </div>
                  );
              })()}

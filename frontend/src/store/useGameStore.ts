@@ -133,19 +133,24 @@ export const useGameStore = create<GameState>((set) => ({
   handleServerMessage: (msg: any) => {
     set((state) => {
       switch (msg.type) {
+        case "welcome":
+             return {
+                 me: state.me ? { ...state.me, name: msg.username, id: msg.id } : null
+             };
+
         case "player_update":
-          // msg.players is a list of {username}.
-          const incomingUsernames = new Set(msg.players.map((p: any) => p.username));
+          // msg.players is a list of {id, username, is_leader}.
+          // const incomingIds = new Set(msg.players.map((p: any) => p.id));
           
           const mergedOthers = msg.players
-             .filter((p: any) => p.username !== state.me?.name)
+             .filter((p: any) => p.id !== state.me?.id)
              .map((p: any) => {
-                const existing = state.others.find(current => current.name === p.username);
+                const existing = state.others.find(current => current.id === p.id);
                 return {
-                    id: p.username,
+                    id: p.id,
                     name: p.username,
                     isMe: false,
-                    isLeader: msg.leader === p.username,
+                    isLeader: p.is_leader,
                 // Preserve existing state
                     lastVideoFrame: existing?.lastVideoFrame,
                     cameraEnabled: existing?.cameraEnabled,
@@ -156,10 +161,11 @@ export const useGameStore = create<GameState>((set) => ({
              });
           
           let myUpdates = {};
-          if (state.me && msg.leader === state.me.name) {
-              myUpdates = { isLeader: true };
-          } else if (state.me && msg.leader !== state.me.name && state.me.isLeader) {
-              myUpdates = { isLeader: false };
+          if (state.me) {
+              const myEntry = msg.players.find((p: any) => p.id === state.me?.id);
+              if (myEntry) {
+                  myUpdates = { isLeader: myEntry.is_leader };
+              }
           }
 
           return { 
@@ -170,7 +176,7 @@ export const useGameStore = create<GameState>((set) => ({
         case "settings_update":
             return { 
                 gameSettings: msg.settings,
-                // votes: msg.votes || {} // No longer using votes
+                votes: msg.votes
             };
         
         case "game_starting":
@@ -204,20 +210,16 @@ export const useGameStore = create<GameState>((set) => ({
             return {};
 
         case "round_over":
-             // msg.results = [ {username, score, feedback, content} ] sorted
-             // We can map this to others and display leaderboard
+             // msg.results = [ {id, username, score, feedback, content} ] sorted
              const leaderboard = msg.leaderboard || [];
              
              // Update others/me from this authoritative list
-             // Actually, simplest is to just use this list for the results page?
-             // But let's sync "others" state.
              const updatedOthers = state.others.map(p => {
-                 const entry = leaderboard.find((l: any) => l.username === p.name);
+                 const entry = leaderboard.find((l: any) => l.user_id === p.id);
                  return entry ? { ...p, score: entry.score, hasSubmitted: true } : { ...p, hasSubmitted: true }; 
-                 // Mark all as submitted since round is over
              });
              
-             const myEntry = leaderboard.find((l: any) => l.username === state.me?.name);
+             const myEntry = leaderboard.find((l: any) => l.user_id === state.me?.id);
              const updatedMe = state.me ? { ...state.me, hasSubmitted: true } : state.me; 
              if (state.me && myEntry) {
                  updatedMe !.score = myEntry.score;
@@ -228,7 +230,7 @@ export const useGameStore = create<GameState>((set) => ({
                  others: updatedOthers,
                  me: updatedMe,
                  leaderboard,
-                 intermissionEndTime: msg.intermission_end_time ? msg.intermission_end_time * 1000 : Date.now() + 120000 // Expecting seconds from python, convert to ms
+                 intermissionEndTime: msg.intermission_end_time ? msg.intermission_end_time * 1000 : Date.now() + 120000 
              };
 
         case "game_over":
@@ -238,31 +240,31 @@ export const useGameStore = create<GameState>((set) => ({
              };
 
         case "video_update":
-            // { type: "video_update", username, frame }
-            if (msg.username === state.me?.name) return {}; // Ignore own echo
+            // { type: "video_update", id, username, frame }
+            if (msg.id === state.me?.id) return {}; // Ignore own
             
             return {
                 others: state.others.map(p => 
-                    p.name === msg.username 
+                    p.id === msg.id 
                     ? { ...p, lastVideoFrame: msg.frame }
                     : p
                 )
             };
 
         case "world_update":
-            // { type: "world_update", players: { username: {x, y} } }
+            // { type: "world_update", players: { user_id: {x, y} } }
             const positions = msg.players;
             
             // Update Me
             let newMe = state.me;
-            if (state.me && positions[state.me.name]) {
-                const myPos = positions[state.me.name];
+            if (state.me && positions[state.me.id]) {
+                const myPos = positions[state.me.id];
                 newMe = { ...state.me, x: myPos.x, y: myPos.y };
             }
             
             // Update Others
             const newOthers = state.others.map(p => {
-                const pos = positions[p.name];
+                const pos = positions[p.id];
                 if (pos) {
                     return { ...p, x: pos.x, y: pos.y };
                 }
@@ -272,29 +274,6 @@ export const useGameStore = create<GameState>((set) => ({
             return {
                 me: newMe,
                 others: newOthers
-            };
-             
-        case "sync_game_state":
-            // { phase, question, current_round, total_rounds }
-            return {
-                phase: msg.phase === "QUESTION" ? "ROUND" : msg.phase,
-                currentQuestion: msg.question,
-                gameSettings: { 
-                    ...state.gameSettings, 
-                    num_rounds: msg.total_rounds 
-                },
-                // If we want to show correct round number in UI
-                // We might need to store 'currentRoundNumber' in store if not present
-                // For now, at least we have the question and phase.
-                roundEndTime: msg.round_end_time ? msg.round_end_time * 1000 : Date.now() + 60000, 
-            };
-
-        case "settings_update":
-            // { type: "settings_update", settings: {...}, votes: {...} }
-            console.log("Received settings_update:", msg);
-            return {
-                gameSettings: msg.settings,
-                votes: msg.votes
             };
 
         default:
