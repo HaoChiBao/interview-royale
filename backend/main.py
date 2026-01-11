@@ -175,6 +175,10 @@ class Game:
         # Wait for intermission
         await asyncio.sleep(60) # 1 minute intermission
 
+        # RACE CONDITION FIX: check if state changed manually (e.g. via Next Round button)
+        if game.state != "INTERMISSION":
+            print(f"Intermission aborted for {room_code}, state is already {game.state}")
+            return
         
         # Check if game over
         if game.current_round >= game.settings["num_rounds"]:
