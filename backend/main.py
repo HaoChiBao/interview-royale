@@ -47,6 +47,7 @@ class Game:
         
         # Physics loop task
         self.physics_task = None
+        self.round_end_time = None
 
     def handle_input(self, username: str, key: str, is_down: bool):
         if username not in self.players:
@@ -117,6 +118,7 @@ class Game:
         self.current_round += 1
         self.current_question = get_random_question()
         self.submissions = {}
+        self.round_end_time = time.time() + self.settings["round_duration"]
         return self.current_question
 
     async def handle_intermission(self, room_code: str):
@@ -300,6 +302,19 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
                 
                 await manager.broadcast_player_list(room_code)
+                
+                # If game is in progress, sync state
+                if game.state != "LOBBY":
+                    # Determine current phase details
+                    # Note: We need to send relevant info depending on phase
+                    await websocket.send_json({
+                        "type": "sync_game_state",
+                        "phase": game.state, # QUESTION, RESULTS, INTERMISSION
+                        "question": game.current_question,
+                        "current_round": game.current_round,
+                        "total_rounds": game.settings["num_rounds"],
+                        "round_end_time": game.round_end_time
+                    })
 
             elif message_type == "update_settings":
                 # {type: update_settings, settings: {num_rounds: 5}}
@@ -308,10 +323,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 if not room_code or room_code not in games: continue
                 
                 game = games[room_code]
+                print(f"Update settings: {username} in {room_code}. State: {game.state}")
                 if game.state == "LOBBY":
                     new_settings = data.get("settings", {})
                     # Cast vote
                     rounds = new_settings.get("num_rounds", 3)
+                    print(f"Casting vote: {rounds}")
                     game.cast_vote(username, rounds)
                     
                     await manager.broadcast_to_room(room_code, {

@@ -4,31 +4,36 @@ QUESTIONS = [
         "id": "lc_two_sum",
         "type": "technical",
         "prompt": "Two Sum: Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target. Assume exactly one solution exists.",
-        "difficulty": "easy"
+        "difficulty": "easy",
+        "starter_code": "def two_sum(nums: list[int], target: int) -> list[int]:\n    # Your code here\n    pass"
     },
     {
         "id": "lc_valid_paren",
         "type": "technical",
         "prompt": "Valid Parentheses: Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.",
-        "difficulty": "easy"
+        "difficulty": "easy",
+        "starter_code": "def isValid(s: str) -> bool:\n    # Your code here\n    pass"
     },
     {
         "id": "lc_best_time_stock",
         "type": "technical",
         "prompt": "Best Time to Buy and Sell Stock: You want to maximize your profit by choosing a single day to buy one stock and choosing a different day in the future to sell that stock. Return the maximum profit you can achieve.",
-        "difficulty": "easy"
+        "difficulty": "easy",
+        "starter_code": "def maxProfit(prices: list[int]) -> int:\n    # Your code here\n    pass"
     },
     {
         "id": "lc_climbing_stairs",
         "type": "technical",
         "prompt": "Climbing Stairs: You are climbing a staircase. It takes n steps to reach the top. Each time you can either climb 1 or 2 steps. In how many distinct ways can you climb to the top?",
-        "difficulty": "easy"
+        "difficulty": "easy",
+        "starter_code": "def climbStairs(n: int) -> int:\n    # Your code here\n    pass"
     },
     {
         "id": "lc_fizz_buzz",
         "type": "technical",
         "prompt": "Fizz Buzz: Given an integer n, return a string array where answer[i] == 'FizzBuzz' if i is divisible by 3 and 5, 'Fizz' if by 3, 'Buzz' if by 5, or i as a string.",
-        "difficulty": "easy"
+        "difficulty": "easy",
+        "starter_code": "def fizzBuzz(n: int) -> list[str]:\n    # Your code here\n    pass"
     },
 
     # --- Behavioral Questions ---
