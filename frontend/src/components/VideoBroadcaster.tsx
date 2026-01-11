@@ -51,7 +51,7 @@ export function VideoBroadcaster({ stream }: VideoBroadcasterProps) {
         const frame = canvasRef.current.toDataURL("image/jpeg", 0.1);
         socketClient.sendVideoFrame(frame);
       }
-    }, 200);
+    }, 66); // ~15 FPS
 
     // outputting "The play() request was interrupted by a call to pause()"
     // We can just clear srcObject and let GC handle it, or check promise.

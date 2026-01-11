@@ -20,6 +20,7 @@ export default function RoundPage() {
   const { code } = useParams();
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [textAnswer, setTextAnswer] = useState("");
+  const [isCalculating, setIsCalculating] = useState(false);
   
   // Stable video ref to prevent flickering
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -51,7 +52,19 @@ export default function RoundPage() {
   // Reset input when question changes
   useEffect(() => {
       setTextAnswer((question as any)?.starter_code || "");
+      setIsCalculating(false);
   }, [question]);
+
+  // Handle Submission Transition
+  useEffect(() => {
+      if (hasSubmitted) {
+          setIsCalculating(true);
+          const timer = setTimeout(() => {
+              setIsCalculating(false);
+          }, 3000); // 3 seconds calculating
+          return () => clearTimeout(timer);
+      }
+  }, [hasSubmitted]);
 
   // Acquire media
   useEffect(() => {
@@ -84,129 +97,137 @@ export default function RoundPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col p-4 md:p-6 bg-white text-zinc-900">
-      <DebugLogButton />
+    <main className="min-h-screen flex flex-col p-4 bg-white text-zinc-900 overflow-hidden font-sans">
       {localStream && <VideoBroadcaster stream={localStream} />}
-      {/* Top Bar: Timer & Question */}
-      <div className="flex justify-between items-start mb-6 gap-4">
-        <Card className="flex-1 bg-white border-zinc-200 shadow-sm">
-           <CardContent className="p-6">
-             <div className="text-sm font-bold text-indigo-500 mb-1 uppercase tracking-wider">
-               {question.type} Question
-             </div>
-             <div className="text-2xl md:text-3xl font-medium leading-tight text-foreground">
-               {question.prompt}
-             </div>
-           </CardContent>
-        </Card>
-        
-        <Card className="w-32 flex justify-center items-center bg-zinc-900 text-white">
-           <CardContent className="p-4 flex flex-col items-center">
-             <span className="text-xs uppercase font-bold opacity-70">Time Left</span>
-             <Timer endTime={roundEndTime} onExpire={handleExpire} />
-           </CardContent>
-        </Card>
+      
+      {/* 1. Header Section: Question & Timer */}
+      <div className="w-full max-w-7xl mx-auto mb-6">
+           <div className="relative border-2 border-green-400 rounded-xl p-6 bg-white shadow-sm flex flex-col gap-2">
+               {/* Pill Badge */}
+               <div className="absolute -top-3 left-6 bg-green-500 text-white text-xs font-bold px-4 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                   {question.type} Question
+               </div>
+               
+               <div className="flex justify-between items-start pt-2">
+                   <h1 className="text-xl md:text-2xl font-semibold leading-tight text-zinc-800 flex-1 pr-8">
+                       {question.prompt}
+                   </h1>
+                   {/* Compact Timer */}
+                    <div className="flex flex-col items-center bg-zinc-900 text-white px-3 py-2 rounded-lg">
+                        <span className="text-[10px] uppercase font-bold text-zinc-400 mb-0.5">Time Left</span>
+                        <Timer endTime={roundEndTime} onExpire={handleExpire} />
+                    </div>
+               </div>
+           </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 flex-1">
-        {/* Main Stage: Recorder & Preview */}
-        <div className="md:col-span-3 flex flex-col gap-4">
-           {/* If we have a local stream, show rendering here? User usually sees themselves big or just the instruction? 
-               Requirement: "Player grid mini view (small)"
-               Actually Render `AvatarStickFigure` for self is usually checking webcam.
-               But `Recorder` manages the preview? 
-               Let's put `Recorder` in main area.
-           */}
-           <Card className="flex-1 flex flex-col items-center justify-center p-8 bg-zinc-50 border-dashed">
-              <div className="w-full max-w-2xl space-y-6 text-center">
-                 {/* Video Preview */}
-                 <div className="relative aspect-video bg-black rounded-lg overflow-hidden shadow-2xl">
-                    {localStream && (
-                      <video 
+      {/* 2. Middle Section: Split View (Video Left | Input Right) */}
+      <div className="flex-1 w-full max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0 mb-6">
+           {/* Left: User Video (Self View) */}
+           <div className="bg-zinc-100 rounded-2xl overflow-hidden border border-zinc-200 relative shadow-inner flex items-center justify-center">
+                {localStream ? (
+                     <video 
                         ref={videoRef}
                         autoPlay muted playsInline 
                         className="w-full h-full object-cover scale-x-[-1]"
-                      />
-                    )}
-                 </div>
-                 
-                 {/* Input Methods Tabs/Toggle could go here, for now stacked */}
-                 
-                  <div className="space-y-4">
-                     {hasSubmitted ? (
-                         <div className="flex flex-col gap-4 animate-in fade-in">
-                             <div className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-4 py-3 rounded-lg flex items-center justify-between">
-                                 <span className="font-bold flex items-center gap-2">
-                                     <div className="h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                                     Intermission Room
-                                 </span>
-                                 <span className="text-sm">Wait for others...</span>
-                             </div>
-                             <IntermissionCanvas />
-                         </div>
-                     ) : (
-                         <div className="space-y-4">
-                             {question.type === "technical" ? (
-                                <div className="relative group">
-                                    <div className="absolute top-0 left-0 right-0 h-8 bg-zinc-800 rounded-t-lg flex items-center px-4 justify-between border-b border-zinc-700">
-                                        <div className="flex gap-1.5">
-                                            <div className="w-3 h-3 rounded-full bg-red-500/80" />
-                                            <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                                            <div className="w-3 h-3 rounded-full bg-green-500/80" />
-                                        </div>
-                                        <div className="text-[10px] font-mono text-zinc-400">main.py</div>
-                                    </div>
-                                    <textarea
-                                        value={textAnswer || (question as any).starter_code || ""}
-                                        onChange={(e) => setTextAnswer(e.target.value)}
-                                        className="w-full min-h-[400px] mt-0 pt-10 p-4 rounded-lg bg-[#1e1e1e] text-zinc-100 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 border border-zinc-700 shadow-inner font-ligatures-contextual"
-                                        spellCheck={false}
-                                        style={{ fontFamily: "'Fira Code', 'JetBrains Mono', monospace" }}
-                                    />
-                                </div>
-                             ) : (
-                                <SpeechTextarea 
-                                    value={textAnswer}
-                                    onChange={setTextAnswer}
-                                    placeholder="Type your answer or use microphone..."
-                                />
-                             )}
-                             
-                             <Button 
-                               size="lg" 
-                               className="w-full text-lg" 
-                               disabled={!textAnswer.trim()}
-                               onClick={handleSubmit}
-                             >
-                               Submit Answer
-                             </Button>
-                         </div>
-                     )}
-                  </div>
-
-                 {/* Status Messages */}
-                 
-
-              </div>
-           </Card>
-        </div>
-
-        {/* Sidebar: Mini Player Grid */}
-        <div className="md:col-span-1 overflow-y-auto max-h-[calc(100vh-120px)] rounded-lg bg-zinc-50 p-4 border block">
-           <h3 className="font-bold text-sm mb-4 uppercase tracking-wider text-muted-foreground">Competitors</h3>
-           <div className="flex flex-col gap-4">
-             {/* We can reuse PlayerGrid with override class or just map manually for mini view.
-                 PlayerGrid is grid-cols-2 by default. Let's make a MiniPlayerList component or just map here. 
-                 Mapping implementation is safer for layout control.
-             */}
-             <PlayerGrid localStream={localStream} /> 
-             {/* PlayerGrid component uses grid layout. It might look okay if container is small (grid-cols-2 forced). 
-                 Actually PlayerGrid is `grid-cols-2 md:grid-cols-3`. Ideally we want `grid-cols-1` or `2` here.
-                 Let's stick with specific specific mapping here or just use PlayerGrid inside a small container which forces wrap.
-             */}
+                     />
+                ) : (
+                    <div className="text-zinc-400 font-medium">Camera off or loading...</div>
+                )}
+                
+                {/* Status Overlay if submitted */}
+                {hasSubmitted && (
+                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white backdrop-blur-sm">
+                        <div className="bg-green-500 rounded-full pap-3 mb-3 p-2">
+                            <div className="h-6 w-6 border-2 border-white border-b-transparent rounded-full animate-spin" />
+                        </div>
+                        <span className="font-bold text-lg">Answer Submitted</span>
+                        <span className="text-sm opacity-80 mt-1">Waiting for others...</span>
+                    </div>
+                )}
            </div>
-        </div>
+
+           {/* Right: Input Area */}
+           <div className="flex flex-col h-full min-h-[400px]">
+                {/* If submitted, show Intermission Canvas overlay or placeholder? */}
+                {/* If submitted, show Intermission Canvas overlay or placeholder? */}
+                {hasSubmitted ? (
+                    isCalculating ? (
+                        <div className="flex-1 bg-zinc-900 border-2 border-zinc-800 rounded-2xl flex flex-col items-center justify-center p-8 relative overflow-hidden text-white animate-in fade-in zoom-in duration-300">
+                             <div className="flex flex-col items-center gap-6 z-10">
+                                 <div className="relative">
+                                     <div className="h-16 w-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                                     <div className="absolute inset-0 flex items-center justify-center font-bold text-xs opacity-50">AI</div>
+                                 </div>
+                                 <div className="text-center">
+                                     <h3 className="text-2xl font-bold mb-2 animate-pulse">Analyzing Code Model...</h3>
+                                     <p className="text-zinc-400">Calculating complexity and efficiency score</p>
+                                 </div>
+                             </div>
+                             {/* Matrix background effect */}
+                             <div className="absolute inset-0 opacity-20" 
+                                style={{ backgroundImage: "linear-gradient(0deg, transparent 24%, rgba(32, 255, 77, .1) 25%, rgba(32, 255, 77, .1) 26%, transparent 27%, transparent 74%, rgba(32, 255, 77, .1) 75%, rgba(32, 255, 77, .1) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(32, 255, 77, .1) 25%, rgba(32, 255, 77, .1) 26%, transparent 27%, transparent 74%, rgba(32, 255, 77, .1) 75%, rgba(32, 255, 77, .1) 76%, transparent 77%, transparent)", backgroundSize: "50px 50px" }}
+                             />
+                        </div>
+                    ) : (
+                        // FULL SCREEN INTERMISSION OVERLAY (Portal-like behavior or just covering everything)
+                        // Actually, to make it immersive, we should probably render this fixed over the whole screen 
+                        // or just replace the middle section.
+                        // User request: "brings them all to that intermission state" ... "roam around ... freely".
+                        // Putting it in the input box is too small. Let's make it cover the screen or at least the middle area.
+                        // Let's replace the ENTIRE Middle Section with the Canvas for this user.
+                        <div className="fixed inset-0 z-40 bg-white">
+                            <IntermissionCanvas localStream={localStream} />
+                        </div>
+                    )
+                ) : (
+                    <div className="flex flex-col gap-4 h-full">
+                         {question.type === "technical" ? (
+                             <div className="flex-1 relative group flex flex-col">
+                                 {/* Simple Header without Mac dots */}
+                                 <div className="h-8 bg-zinc-900 rounded-t-xl flex items-center px-4 justify-between border-b border-zinc-700 shrink-0">
+                                     <div className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest font-bold">Solution.py</div>
+                                     <div className="text-[10px] text-zinc-600">Python 3.10</div>
+                                 </div>
+                                 <textarea
+                                     value={textAnswer || (question as any).starter_code || ""}
+                                     onChange={(e) => setTextAnswer(e.target.value)}
+                                     className="flex-1 p-4 rounded-b-xl bg-[#1e1e1e] text-zinc-100 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 border border-zinc-700 shadow-inner"
+                                     spellCheck={false}
+                                     style={{ fontFamily: "'Fira Code', monospace" }}
+                                 />
+                             </div>
+                         ) : (
+                             <Card className="flex-1 border-2 border-zinc-100 shadow-sm overflow-hidden flex flex-col">
+                                 <SpeechTextarea 
+                                     value={textAnswer}
+                                     onChange={setTextAnswer}
+                                     placeholder="Type your answer here or click the mic to dictate..."
+                                     className="flex-1 h-full border-0 p-6 text-lg"
+                                 />
+                             </Card>
+                         )}
+                         
+                         <Button 
+                           size="lg" 
+                           onClick={handleSubmit}
+                           disabled={!textAnswer.trim()}
+                           className="h-14 text-lg font-bold shadow-lg shadow-indigo-500/20 rounded-xl"
+                         >
+                           Submit Answer
+                         </Button>
+                    </div>
+                )}
+           </div>
       </div>
+
+      {/* 3. Bottom Section: Competitors Row */}
+      {/* Hide this if we are in full screen intermission */}
+      {!hasSubmitted && (
+          <div className="flex-none pt-4 pb-2 border-t border-zinc-100 bg-zinc-50/50 -mx-4 px-4 sticky bottom-0 relative min-h-[160px] z-50">
+               <PlayerGrid localStream={null} variant="running-row" excludeMe={true} />
+          </div>
+      )}
     </main>
   );
 }

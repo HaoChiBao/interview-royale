@@ -14,9 +14,14 @@ const lerp = (start: number, end: number, t: number) => {
     return start * (1 - t) + end * t;
 };
 
-export function IntermissionCanvas() {
+interface IntermissionCanvasProps {
+    localStream?: MediaStream | null;
+}
+
+export function IntermissionCanvas({ localStream }: IntermissionCanvasProps) {
     const me = useGameStore(s => s.me);
     const others = useGameStore(s => s.others);
+    const phase = useGameStore(s => s.phase);
     const intermissionEndTime = useGameStore(s => s.intermissionEndTime);
 
     const [timeLeft, setTimeLeft] = useState(0);
@@ -36,8 +41,8 @@ export function IntermissionCanvas() {
         return () => clearInterval(timer);
     }, [intermissionEndTime]);
 
-    // Local stream state
-    const [stream, setStream] = useState<MediaStream | null>(null);
+    // Use prop stream
+    const stream = localStream || null;
 
     // Visual state (interpolated positions)
     const [visualState, setVisualState] = useState<Record<string, { x: number, y: number }>>({});
@@ -47,27 +52,6 @@ export function IntermissionCanvas() {
 
     // Key state tracking to avoid spamming
     const pressedKeys = useRef<Set<string>>(new Set());
-
-    // 1. Get User Media
-    useEffect(() => {
-        let localStream: MediaStream | null = null;
-        const startVideo = async () => {
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                setStream(localStream);
-
-                // Video broadcasting is handled by VideoBroadcaster component in parent
-            } catch (err) {
-                console.error("Camera error:", err);
-            }
-        };
-
-        const cleanupPromise = startVideo();
-        return () => {
-            // Cleanup stream
-            stream?.getTracks().forEach(t => t.stop());
-        };
-    }, []);
 
     // 2. Input Handling
     useEffect(() => {
@@ -199,29 +183,53 @@ export function IntermissionCanvas() {
                   }} 
              />
 
-            <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-white/90 px-6 py-2 rounded-full shadow-lg border border-blue-100 z-50 flex flex-col items-center">
-                <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">
-                    Intermission
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                    {timeLeft > 0
-                        ? `Next round in ${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`
-                        : "Starting soon..."}
-                </p>
+            {/* LEADER BADGE (Top Center) */}
+            {me?.isLeader && (
+                <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black/80 text-white px-4 py-1.5 rounded-full shadow-sm text-xs font-medium backdrop-blur-md z-50 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse" />
+                    You are the leader
+                </div>
+            )}
 
-                {/* Leader Controls */}
-                {me?.isLeader && timeLeft > 0 && (
-                    <button
-                        onClick={() => socketClient.send("skip_intermission", {})}
-                        className="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1 rounded-full shadow transition-colors"
-                    >
-                        Skip Intermission
-                    </button>
-                )}
-            </div>
+            {/* MAIN INTERMISSION PANEL (Bottom Center) - Compact & Sleek */}
+            {/* HIDE IN LOBBY */}
+            {phase !== "LOBBY" && (
+                <div className="absolute bottom-12 left-1/2 -translate-x-1/2 bg-white/95 px-6 py-4 rounded-2xl shadow-2xl shadow-black/5 border border-zinc-100 z-50 flex flex-col items-center gap-1.5 backdrop-blur-sm min-w-[240px]">
+                    <h2 className="text-lg font-bold text-zinc-900 tracking-tight">
+                        Intermission
+                    </h2>
+                    
+                    <div className="flex items-center gap-2 text-zinc-500 text-sm font-medium">
+                        {timeLeft > 0 ? (
+                            <>
+                                <span>Next round in</span>
+                                <span className="font-mono text-zinc-900 font-bold bg-zinc-100 px-1.5 py-0.5 rounded text-xs">
+                                    {Math.floor(timeLeft / 60)}:{((timeLeft % 60) + "").padStart(2, "0")}
+                                </span>
+                            </>
+                        ) : (
+                            <span>Starting soon...</span>
+                        )}
+                    </div>
 
-            <div className="absolute bottom-8 left-8 bg-white/80 p-3 rounded-xl shadow backdrop-blur-sm text-sm text-slate-600 border border-slate-200">
-                Use <kbd className="bg-slate-200 px-1 rounded">WASD</kbd> to move
+                    {/* Leader Controls (Inside Bottom Panel) */}
+                    {me?.isLeader && timeLeft > 0 && (
+                        <button
+                            onClick={() => socketClient.send("skip_intermission", {})}
+                            className="mt-2 bg-white hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 text-xs font-semibold px-4 py-1.5 rounded-full border border-zinc-200 shadow-sm transition-all hover:border-zinc-300 active:scale-95 flex items-center gap-1.5 group"
+                        >
+                            Skip Wait
+                            <svg className="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* WASD Hint (Bottom Left - moved up slightly to avoid conflict if screen small, or keep but ensure z-index) */}
+            <div className="absolute bottom-8 left-8 bg-white/50 p-3 rounded-xl shadow-sm backdrop-blur-sm text-xs font-medium text-slate-500 border border-slate-100/50">
+                Use <kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-700 mx-0.5 shadow-[0_1px_0_rgba(0,0,0,0.1)]">WASD</kbd> to move
             </div>
 
             {/* DEBUG OVERLAY */}
@@ -238,8 +246,8 @@ export function IntermissionCanvas() {
                 const isMe = me?.id === id;
                 const player = isMe ? me : others.find(o => o.id === id);
 
-                // Only show if submitted (or if it's me)
-                if (!isMe && !player?.hasSubmitted) return null;
+                // Only show if submitted (or if it's me, or if in LOBBY)
+                if (!isMe && !player?.hasSubmitted && phase !== "LOBBY") return null;
 
                 // Apply camera offset
                 const screenX = pos.x + camOffsetX;

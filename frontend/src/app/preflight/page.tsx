@@ -10,6 +10,10 @@ import { getMediaStream } from "@/lib/media";
 import { Loader2, Mic, Video, VideoOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
+import Image from "next/image";
+// @ts-ignore
+import titleImage from "@/assets/title.png";
+
 function PreflightContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -84,45 +88,78 @@ function PreflightContent() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-white text-zinc-900">
-      <Card className="w-full max-w-md">
-        <CardContent className="p-6 flex flex-col items-center gap-6">
-          <CardTitle>Setup Your Avatar</CardTitle>
+    <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-zinc-50 text-zinc-900 font-sans">
+      {/* Banner Title */}
+      <div className="mb-8">
+          <Image src={titleImage} alt="Interview Royale" width={300} height={80} className="w-auto h-16 object-contain opacity-90" />
+      </div>
+
+      <Card className="w-full max-w-sm shadow-xl shadow-zinc-200/50 border-0 overflow-visible bg-white">
+        <CardContent className="pt-12 pb-8 px-8 flex flex-col items-center gap-6">
+          <h1 className="text-xl font-bold tracking-tight text-zinc-800">Setup Your Avatar</h1>
           
-          <div className="relative flex justify-center py-8 w-full bg-zinc-100 rounded-lg dark:bg-zinc-900/50">
-            <AvatarStickFigure
-              name={name}
-              isMe={true}
-              stream={stream}
-              cameraEnabled={cameraEnabled}
-              className="scale-150"
-            />
+          {/* Avatar Container - Increased margin to prevent overlap due to scaling */}
+          <div className="relative flex justify-center items-center w-full h-[220px] bg-zinc-100/50 rounded-2xl mb-6 border border-zinc-100">
+            <div className="transform scale-110 origin-center ">
+                <AvatarStickFigure
+                  name={name}
+                  isMe={true}
+                  stream={stream}
+                  cameraEnabled={cameraEnabled}
+                />
+            </div>
+            
+            {/* Name Badge */}
+            <div className="absolute top-3 right-3 bg-white/90 text-zinc-800 text-xs px-2.5 py-1 rounded-md font-medium shadow-sm border border-zinc-200/50 backdrop-blur-sm">
+                {name} <span className="text-zinc-400 font-normal ml-1">(You)</span>
+            </div>
           </div>
 
-          {error && (
-            <Badge variant="destructive" className="mb-2">
-              {error}
-            </Badge>
-          )}
+          <div className="flex flex-col items-center gap-4 w-full">
+              {/* Controls */}
+              <div className="flex gap-3">
+                 <Button 
+                    size="icon" 
+                    onClick={toggleVideo} 
+                    disabled={!stream}
+                    className={`rounded-full w-10 h-10 transition-colors ${cameraEnabled ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-red-500 hover:bg-red-600'}`}
+                 >
+                   {cameraEnabled ? <Video className="w-4 h-4 text-white" /> : <VideoOff className="w-4 h-4 text-white" />}
+                 </Button>
+                 <Button 
+                    size="icon" 
+                    disabled 
+                    variant="outline"
+                    className="rounded-full w-10 h-10 border-zinc-200 bg-white"
+                 >
+                   <Mic className="w-4 h-4 text-zinc-400" />
+                 </Button>
+              </div>
 
-          <div className="flex gap-4">
-             <Button variant={cameraEnabled ? "default" : "secondary"} size="icon" onClick={toggleVideo} disabled={!stream}>
-               {cameraEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-             </Button>
-             <Button variant="secondary" size="icon" disabled>
-               <Mic className="w-4 h-4" />
-             </Button>
-          </div>
-          
-          <div className="w-full text-center text-sm text-muted-foreground">
-             Room: <span className="font-mono font-bold text-foreground">{code}</span>
-          </div>
+              {error && (
+                <div className="text-xs text-red-500 text-center font-medium bg-red-50 px-3 py-1 rounded-md">
+                  {error}
+                </div>
+              )}
+              
+              <div className="text-xs text-zinc-400 font-medium mt-1">
+                 Room Code: <span className="font-mono text-zinc-600">{code}</span>
+              </div>
 
-          <Button className="w-full" size="lg" onClick={handleEnter}>
-            Enter Lobby
-          </Button>
+              <Button 
+                className="w-full text-white font-bold h-11 rounded-xl shadow-lg shadow-blue-500/20 mt-2 hover:brightness-110 transition-all active:scale-[0.98]" 
+                style={{ backgroundColor: '#4294DD' }}
+                onClick={handleEnter}
+              >
+                Enter Lobby
+              </Button>
+          </div>
         </CardContent>
       </Card>
+      
+      <div className="mt-8 text-xs text-zinc-300 font-medium">
+          Ready to interview?
+      </div>
     </main>
   );
 }

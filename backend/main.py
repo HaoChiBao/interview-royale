@@ -67,7 +67,7 @@ class Game:
 
     async def run_physics_loop(self, room_code: str):
         print(f"Starting physics loop for {room_code}")
-        while self.state == "INTERMISSION": # Only run during intermission? Or always?
+        while self.state in ["LOBBY", "INTERMISSION", "QUESTION"]: # Allow physics during lobby and question for early finishers
             # Ideally always if we want movement in lobby too, but let's stick to Intermission request.
             # Actually, user said "Intermission Room", but let's make it robust.
             # If we constrain to Intermission, we need to start/stop this task.
@@ -136,12 +136,20 @@ class Game:
         # But conceptually, we will pick from self.votes at start.
         self.settings["num_rounds"] = num_rounds 
     
-    def start_round(self):
+    async def _ensure_physics(self, room_code):
+        if self.physics_task is None or self.physics_task.done():
+             self.physics_task = asyncio.create_task(self.run_physics_loop(room_code))
+
+    async def start_round(self, room_code): # Needs room_code to start physics
         self.state = "QUESTION"
         self.current_round += 1
         self.current_question = get_random_question()
         self.submissions = {}
         self.round_end_time = time.time() + self.settings["round_duration"]
+        
+        # Ensure physics loop is running for this round
+        await self._ensure_physics(room_code)
+        
         return self.current_question
 
     async def handle_intermission(self, room_code: str):
@@ -167,7 +175,7 @@ class Game:
             return
 
         # Start next round
-        question = game.start_round()
+        question = await game.start_round(room_code)
         
         # Start monitoring
         asyncio.create_task(game.monitor_round(room_code, game.current_round))
@@ -272,13 +280,16 @@ class ConnectionManager:
     async def broadcast_to_room(self, room_code: str, message: dict):
         if not room_code: return
         
+        # Parallelize sends to reduce latency
+        tasks = []
         # Iterate over a copy to avoid RuntimeError if connections close during iteration
         for connection, data in list(self.active_connections.items()):
             if data.get("room_code") == room_code:
-                try:
-                    await connection.send_json(message)
-                except:
-                    pass
+                tasks.append(connection.send_json(message))
+        
+        if tasks:
+            # Gather all send tasks; ignore individual failures (disconnects)
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def broadcast_player_list(self, room_code: str):
         if not room_code: return
@@ -372,9 +383,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 
                 # Generate User ID for creator
                 user_id = f"Guest{random.randint(100, 999)}"
-                # Ensure user_id uniqueness? Ideally yes, but probability low for now. 
-                # Let's loop briefly
-                while user_id in games[room_code].players: # Empty at first but good practice
+                while user_id in games[room_code].players: 
                      user_id = f"Guest{random.randint(100, 999)}"
 
                 # Initialize creator's vote to default
@@ -382,20 +391,23 @@ async def websocket_endpoint(websocket: WebSocket):
                 games[room_code].leader = user_id # Creator is leader
                 print(f"Created new room: {room_code} by {user_id} ({username})")
                 
-                manager.active_connections[websocket]["username"] = user_id # Force username to be GuestXXX
+                manager.active_connections[websocket]["username"] = user_id 
                 manager.active_connections[websocket]["user_id"] = user_id
                 manager.active_connections[websocket]["room_code"] = room_code
                 
-                # Notify creator (they need the room code to share)
+                # Notify creator
                 await websocket.send_json({
                     "type": "room_created",
                     "room_code": room_code
                 })
                 
                 # Add to game state immediately
-                games[room_code].players[user_id] = PlayerState(user_id) # Consistent naming
+                games[room_code].players[user_id] = PlayerState(user_id)
 
-                # Send welcome with confirmed name
+                # START PHYSICS
+                await games[room_code].start_physics(room_code)
+
+                # Send welcome
                 await websocket.send_json({
                     "type": "welcome",
                     "id": user_id,
@@ -415,24 +427,25 @@ async def websocket_endpoint(websocket: WebSocket):
                     games[room_code] = Game()
 
                 # Generate unique ID
-                # We do NOT rename username anymore. We generate a unique ID.
                 user_id = f"Guest{random.randint(100, 999)}"
-                # Ensure unique in room
                 active_ids = [d["user_id"] for d in manager.active_connections.values() if d.get("room_code") == room_code]
                 while user_id in active_ids:
                     user_id = f"Guest{random.randint(100, 999)}"
 
-                manager.active_connections[websocket]["username"] = user_id # Force username to be GuestXXX
+                manager.active_connections[websocket]["username"] = user_id 
                 manager.active_connections[websocket]["user_id"] = user_id
                 manager.active_connections[websocket]["room_code"] = room_code
                 
                 print(f"Player {username} -> {user_id} joined room {room_code}")
 
-                # Send welcome with assigned ID
+                # START PHYSICS (if not already running)
+                await games[room_code].start_physics(room_code)
+
+                # Send welcome
                 await websocket.send_json({
                     "type": "welcome",
                     "id": user_id, 
-                    "username": user_id, # Consistent naming
+                    "username": user_id, 
                     "room_code": room_code
                 })
                 
@@ -510,14 +523,14 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
                 
                 # 3 second countdown logic on server (wait before sending new question)
-                await asyncio.sleep(4) 
+                await asyncio.sleep(3) 
 
                 # Reset game state
                 if game.state == "LOBBY" or game.state == "GAME_OVER":
                      game.current_round = 0
                      game.cumulative_scores = {}
                 
-                question = game.start_round()
+                question = await game.start_round(room_code)
                 
                 # Start round monitoring
                 asyncio.create_task(game.monitor_round(room_code, game.current_round))
@@ -548,7 +561,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             "leaderboard": game.get_leaderboard()
                          })
                     else:
-                        question = game.start_round() # This changes state to QUESTION
+                        question = await game.start_round(room_code) # This changes state to QUESTION
                         
                         # Start round monitoring
                         asyncio.create_task(game.monitor_round(room_code, game.current_round))
@@ -577,7 +590,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         "leaderboard": game.get_leaderboard()
                      })
                 else:
-                    question = game.start_round()
+                    question = await game.start_round(room_code)
                     
                     # Start round monitoring
                     asyncio.create_task(game.monitor_round(room_code, game.current_round))

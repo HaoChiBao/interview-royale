@@ -5,13 +5,14 @@ import { useRouter, useParams } from "next/navigation";
 import { useGameStore } from "@/store/useGameStore";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { PlayerGrid } from "@/components/PlayerGrid";
+import { IntermissionCanvas } from "@/components/IntermissionCanvas";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Play } from "lucide-react";
 import { getMediaStream } from "@/lib/media";
 import { socketClient } from "@/lib/socket";
 import { DebugLogButton } from "@/components/DebugLogButton";
 import { VideoBroadcaster } from "@/components/VideoBroadcaster";
+
 
 export default function LobbyPage() {
   const router = useRouter();
@@ -128,6 +129,10 @@ export default function LobbyPage() {
 
   return (
     <main className="min-h-screen flex flex-col p-4 md:p-8 bg-white text-zinc-900 overflow-hidden relative">
+      <div className="fixed inset-0 z-0">
+          <IntermissionCanvas localStream={localStream} />
+      </div>
+
       <DebugLogButton />
       {localStream && <VideoBroadcaster stream={localStream} />}
 
@@ -147,69 +152,72 @@ export default function LobbyPage() {
           <CountdownOverlay />
       )}
 
-      <header className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-2xl font-bold">Lobby</h1>
-          <div className="flex items-center gap-2 text-muted-foreground hover:text-foreground cursor-pointer" onClick={copyCode}>
-            <span className="font-mono text-xl">{roomCode}</span>
-            <Copy className="w-4 h-4" />
+      {/* Header Overlay */}
+      <header className="fixed top-0 left-0 right-0 z-10 flex justify-between items-center p-8 pointer-events-none">
+        
+        {/* Room Code Pill */}
+        <div className="pointer-events-auto bg-white/90 backdrop-blur-md px-5 py-3 rounded-2xl border border-zinc-200 shadow-sm flex items-center gap-4">
+          <div>
+              <div className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Room Code</div>
+              <div className="flex items-center gap-2 text-zinc-800 hover:text-indigo-600 cursor-pointer transition-colors" onClick={copyCode}>
+                <span className="font-mono text-xl font-black tracking-tight">{roomCode}</span>
+                <Copy className="w-4 h-4" />
+              </div>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-           <Badge variant="outline" className="text-base px-3 py-1">
+
+        {/* Player Count Pill */}
+        <div className="pointer-events-auto">
+           <Badge variant="outline" className="text-base px-4 py-2 bg-white/90 backdrop-blur-md border-zinc-200 text-zinc-700 shadow-sm">
              {others.length + 1} Players
            </Badge>
         </div>
       </header>
 
-      <section className="flex-1 w-full relative">
-         <div className="absolute inset-0 pb-40">
-            <PlayerGrid localStream={localStream} />
-         </div>
-      </section>
-
-      <footer className="fixed bottom-0 left-0 right-0 z-20 flex justify-center flex-col items-center gap-4 py-6 bg-white/20 backdrop-blur-xl border-t border-white/20 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-        <div className="flex flex-col md:flex-row gap-8 items-center w-full max-w-4xl px-4">
+      {/* Replaced PlayerGrid Section with nothing (Canvas is bg) */}
+      
+      {/* Footer Overlay */}
+      <footer className="fixed bottom-0 left-0 right-0 z-20 flex justify-center flex-col items-center gap-4 py-6 pointer-events-none">
+        <div className="flex flex-col md:flex-row gap-6 items-end w-full max-w-4xl px-4 pointer-events-auto">
            
-           {/* Game Settings Card - High Contrast */}
-            <div className="bg-white border-2 border-zinc-200 p-6 rounded-xl flex-1 w-full shadow-lg">
-                <h3 className="font-bold text-sm uppercase text-zinc-500 mb-4 tracking-wider">Game Settings</h3>
+           {/* Game Settings Card - Floating */}
+            <div className="bg-white/90 border border-zinc-200/50 p-6 rounded-2xl flex-1 w-full shadow-xl backdrop-blur-md">
+                <h3 className="font-bold text-xs uppercase text-zinc-400 mb-3 tracking-wider">Game Settings</h3>
                 <div className="flex items-center justify-between">
-                    <span className="font-medium text-lg">Number of Rounds</span>
+                    <span className="font-medium text-zinc-700">Number of Rounds</span>
                     <div className="flex items-center gap-3">
                         {me?.isLeader ? (
                              <>
                                 <Button 
-                                variant="outline" size="icon" className="h-10 w-10 rounded-full border-2"
+                                variant="outline" size="icon" className="h-8 w-8 rounded-full border-zinc-300"
                                 onClick={() => updateSettings({ num_rounds: gameSettings.num_rounds - 1 })}
                                 disabled={isChoosingSettings || useGameStore.getState().isStarting}
                                 > - </Button>
-                                <span className="w-12 text-center font-black text-3xl">{gameSettings.num_rounds}</span>
+                                <span className="w-8 text-center font-bold text-xl text-zinc-800">{gameSettings.num_rounds}</span>
                                 <Button 
-                                variant="outline" size="icon" className="h-10 w-10 rounded-full border-2"
+                                variant="outline" size="icon" className="h-8 w-8 rounded-full border-zinc-300"
                                 onClick={() => updateSettings({ num_rounds: gameSettings.num_rounds + 1 })}
                                 disabled={isChoosingSettings || useGameStore.getState().isStarting}
                                 > + </Button>
                              </>
                         ) : (
-                             <span className="w-12 text-center font-black text-3xl text-zinc-400">{gameSettings.num_rounds}</span>
+                             <span className="w-8 text-center font-bold text-xl text-zinc-400">{gameSettings.num_rounds}</span>
                         )}
                     </div>
                 </div>
                 {!me?.isLeader && (
-                    <p className="text-xs text-zinc-400 mt-4 text-center">
-                        Only the leader can change settings.
+                    <p className="text-[10px] text-zinc-400 mt-2 text-center uppercase tracking-wide">
+                        Host Controls Only
                     </p>
                 )}
             </div>
 
             {/* Start Button Area */}
-            {/* Start Button Area - Only Leader */}
             <div className="flex-1 w-full flex flex-col items-center justify-center gap-4">
                  {me?.isLeader ? (
                      <Button 
                         size="lg" 
-                        className="w-full max-w-sm font-bold text-xl h-16 shadow-xl shadow-indigo-500/20 rounded-2xl transition-all hover:scale-105 active:scale-95"
+                        className="w-full font-bold text-lg h-16 shadow-xl shadow-indigo-500/30 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] bg-indigo-600 hover:bg-indigo-700 text-white border-2 border-indigo-500/50"
                         onClick={handleStart}
                         disabled={isChoosingSettings || useGameStore.getState().isStarting} 
                     >
@@ -217,8 +225,8 @@ export default function LobbyPage() {
                         {useGameStore.getState().isStarting ? "Starting..." : "Start Game"}
                     </Button>
                  ) : (
-                     <div className="text-center p-4 bg-zinc-100 rounded-lg text-zinc-500 font-medium">
-                        Waiting for leader to start...
+                     <div className="text-center p-4 bg-white/80 backdrop-blur rounded-xl text-zinc-500 font-medium border border-white/40 shadow-lg w-full">
+                        Waiting for leader...
                      </div>
                  )}
             </div>
