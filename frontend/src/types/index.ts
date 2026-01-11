@@ -14,6 +14,8 @@ export interface Player {
   lastVideoFrame?: string; // base64 data URI
   x?: number;
   y?: number;
+  isMoving?: boolean;
+  facingRight?: boolean;
   isLeader?: boolean;
 }
 

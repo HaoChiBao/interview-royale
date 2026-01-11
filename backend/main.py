@@ -28,6 +28,8 @@ class PlayerState:
         self.x = x
         self.y = y
         self.keys = {"w": False, "a": False, "s": False, "d": False}
+        self.is_moving = False
+        self.facing_right = True
         self.last_update = time.time()
 
 class Game:
@@ -88,11 +90,26 @@ class Game:
                 p.x += dx
                 p.y += dy
                 
+                # Update movement state
+                p.is_moving = (dx != 0 or dy != 0)
+                
+                # Update facing direction (only if moving horizontally)
+                if p.keys["a"] and not p.keys["d"]:
+                    p.facing_right = False
+                elif p.keys["d"] and not p.keys["a"]:
+                    p.facing_right = True
+                
                 # Infinite boundaries
                 # p.x = max(0, min(800, p.x))
                 # p.y = max(0, min(600, p.y))
                 
-                state_snapshot[uid] = {"x": p.x, "y": p.y, "username": p.username}
+                state_snapshot[uid] = {
+                    "x": p.x, 
+                    "y": p.y, 
+                    "username": p.username,
+                    "is_moving": p.is_moving,
+                    "facing_right": p.facing_right
+                }
             
             if state_snapshot:
                 await manager.broadcast_to_room(room_code, {
