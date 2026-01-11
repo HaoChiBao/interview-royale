@@ -42,6 +42,9 @@ export function IntermissionCanvas() {
     // Visual state (interpolated positions)
     const [visualState, setVisualState] = useState<Record<string, { x: number, y: number }>>({});
 
+    // Audio volume state for visual indicators
+    const [audioVolumes, setAudioVolumes] = useState<Record<string, number>>({});
+
     // Key state tracking to avoid spamming
     const pressedKeys = useRef<Set<string>>(new Set());
 
@@ -247,7 +250,7 @@ export function IntermissionCanvas() {
 
                 return (
                     <div
-                        key={id}
+                        key={`${id}-${isMe ? 'me' : 'other'}`}
                         className="absolute"
                         style={{
                             transform: `translate(${screenX}px, ${screenY}px)`,
@@ -264,6 +267,7 @@ export function IntermissionCanvas() {
                             lastVideoFrame={player?.lastVideoFrame}
                             isMoving={player?.isMoving}
                             facingRight={player?.facingRight}
+                            volume={audioVolumes[player?.id || ""]}
                         />
                     </div>
                 );
@@ -355,7 +359,10 @@ export function IntermissionCanvas() {
             })()}
 
 
-            <AudioChat visualState={visualState} />
+            <AudioChat
+                visualState={visualState}
+                onVolumeChange={(vols) => setAudioVolumes(vols)}
+            />
         </div>
     );
 }

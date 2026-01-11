@@ -43,15 +43,20 @@ function base64ToFloat32(base64: string): Float32Array {
 
 interface AudioChatProps {
     visualState: Record<string, { x: number, y: number }>;
+    onVolumeChange: (volumes: Record<string, number>) => void;
 }
 
-export function AudioChat({ visualState }: AudioChatProps) {
+export function AudioChat({ visualState, onVolumeChange }: AudioChatProps) {
     const me = useGameStore(s => s.me);
 
     // Audio Context Refs
     const audioCtxRef = useRef<AudioContext | null>(null);
     const processorRef = useRef<ScriptProcessorNode | null>(null);
     const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+
+    // Analysis Refs
+    const analysersRef = useRef<Record<string, AnalyserNode>>({});
+    const animationFrameRef = useRef<number | undefined>(undefined);
 
     // Remote Peers State
     // access via refs to avoid closure staleness in message handlers
@@ -83,6 +88,12 @@ export function AudioChat({ visualState }: AudioChatProps) {
                 compressor.ratio.value = 4;        // 4:1 is standard for voice
                 compressor.attack.value = 0.002;   // Fast attack to catch peaks
                 compressor.release.value = 0.15;   // Natural release
+
+                // Create Analyser for Local User
+                const analyser = ctx.createAnalyser();
+                analyser.fftSize = 256;
+                analyser.smoothingTimeConstant = 0.5;
+                analysersRef.current["me"] = analyser;
 
                 // Create Processor
                 // BufferSize 16384 @ 48kHz = ~341ms.
@@ -119,6 +130,7 @@ export function AudioChat({ visualState }: AudioChatProps) {
 
                 // Connect graph
                 source.connect(compressor);
+                source.connect(analyser); // Analyze pre-compression or post? Pre is raw dynamic range.
                 compressor.connect(processor);
                 processor.connect(ctx.destination); // ScriptProcessor needs destination to run
 
@@ -135,6 +147,7 @@ export function AudioChat({ visualState }: AudioChatProps) {
             audioCtxRef.current?.close();
             // CRITICAL: Clear peer nodes because they belong to the closed context.
             peerNodes.current = {};
+            analysersRef.current = {};
         };
     }, []);
 
@@ -167,6 +180,14 @@ export function AudioChat({ visualState }: AudioChatProps) {
             if (!peer) {
                 const gainParams = ctx.createGain();
                 gainParams.connect(ctx.destination);
+
+                // Create Analyser for Peer
+                const analyser = ctx.createAnalyser();
+                analyser.fftSize = 256;
+                analyser.smoothingTimeConstant = 0.5;
+                gainParams.connect(analyser);
+                analysersRef.current[data.id] = analyser;
+
                 peer = { gain: gainParams, nextTime: ctx.currentTime };
                 peerNodes.current[data.id] = peer;
             }
@@ -202,42 +223,78 @@ export function AudioChat({ visualState }: AudioChatProps) {
     }, [me?.id]);
 
 
-    // 3. Update Volumes based on Distance
+    // 3. Update Volumes based on Distance & RMS Loop
     useEffect(() => {
-        if (!visualState || !me) return;
+        // Distance Logic
+        if (visualState && me && audioCtxRef.current) {
+            const myPos = visualState[me.id];
+            if (myPos) {
+                Object.entries(peerNodes.current).forEach(([id, peer]) => {
+                    if (!peer) return;
+                    const otherPos = visualState[id];
+                    if (!otherPos) return;
 
-        const myPos = visualState[me.id];
-        if (!myPos) return;
+                    const dist = Math.sqrt(
+                        Math.pow(otherPos.x - myPos.x, 2) + Math.pow(otherPos.y - myPos.y, 2)
+                    );
 
-        Object.entries(peerNodes.current).forEach(([id, peer]) => {
-            if (!peer) return;
-            const otherPos = visualState[id];
-            if (!otherPos) return;
+                    // Full volume at 0-100px. Linear drop to 0 at 600px.
+                    const MAX_DIST = 600;
+                    const MIN_DIST = 100;
 
-            const dist = Math.sqrt(
-                Math.pow(otherPos.x - myPos.x, 2) + Math.pow(otherPos.y - myPos.y, 2)
-            );
+                    let volume = 1;
+                    if (dist > MIN_DIST) {
+                        volume = 1 - (dist - MIN_DIST) / (MAX_DIST - MIN_DIST);
+                    }
+                    volume = Math.max(0, Math.min(1, volume));
 
-            // Full volume at 0-100px. Linear drop to 0 at 600px.
-            const MAX_DIST = 600;
-            const MIN_DIST = 100;
-
-            let volume = 1;
-            if (dist > MIN_DIST) {
-                volume = 1 - (dist - MIN_DIST) / (MAX_DIST - MIN_DIST);
+                    // Ease value
+                    try {
+                        if (audioCtxRef.current?.state === 'running') {
+                            peer.gain.gain.setTargetAtTime(volume, audioCtxRef.current!.currentTime, 0.1);
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                });
             }
-            volume = Math.max(0, Math.min(1, volume));
+        }
 
-            // Ease value
-            try {
-                if (audioCtxRef.current?.state === 'running') {
-                    peer.gain.gain.setTargetAtTime(volume, audioCtxRef.current!.currentTime, 0.1);
+        // RMS Analysis Loop (runs at 10-20 FPS independent of game loop)
+        const updateVolumes = () => {
+            const volumes: Record<string, number> = {};
+
+            // Process all analysers
+            Object.entries(analysersRef.current).forEach(([id, analyser]) => {
+                const data = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(data);
+
+                // Calculate RMS
+                let sum = 0;
+                for (let i = 0; i < data.length; i++) {
+                    sum += data[i] * data[i];
                 }
-            } catch (e) {
-                // ignore
-            }
-        });
-    }, [visualState, me]); // Run whenever positions update (60fps potentially)
+                const rms = Math.sqrt(sum / data.length);
+
+                // Normalize 0-255 -> 0-1
+                // Apply gate: if < 0.05 (noise floor), clamp to 0
+                const val = rms / 255;
+                volumes[id === "me" && me ? me.id : id] = val < 0.05 ? 0 : val;
+            });
+
+            onVolumeChange(volumes);
+
+            animationFrameRef.current = requestAnimationFrame(updateVolumes);
+        };
+
+        // Start loop
+        animationFrameRef.current = requestAnimationFrame(updateVolumes);
+
+        return () => {
+            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+        };
+
+    }, [visualState, me, onVolumeChange]);
 
     return null; // Headless component
 }
