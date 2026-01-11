@@ -13,6 +13,7 @@ import { socketClient } from "@/lib/socket";
 import { DebugLogButton } from "@/components/DebugLogButton";
 import { VideoBroadcaster } from "@/components/VideoBroadcaster";
 import { SpeechTextarea } from "@/components/SpeechTextarea";
+import { IntermissionCanvas } from "@/components/IntermissionCanvas";
 
 export default function RoundPage() {
   const router = useRouter();
@@ -32,6 +33,7 @@ export default function RoundPage() {
   const question = useGameStore(s => s.currentQuestion);
   const roundEndTime = useGameStore(s => s.roundEndTime);
   const phase = useGameStore(s => s.phase);
+  const hasSubmitted = useGameStore(s => s.me?.hasSubmitted);
   // const recordingBlob = useGameStore(s => s.recordingBlob);
   // const setRecording = useGameStore(s => s.setRecording);
 
@@ -58,8 +60,8 @@ export default function RoundPage() {
 
   // Handle timer expire
   const handleExpire = () => {
-       // Auto submit text fallback or empty
-       socketClient.submit("Time expired, no answer.");
+       // Auto submit what we have
+       socketClient.submit(textAnswer || "Time expired, no answer.");
   };
 
   const handleSubmit = () => {
@@ -124,19 +126,34 @@ export default function RoundPage() {
                  {/* Input Methods Tabs/Toggle could go here, for now stacked */}
                  
                   <div className="space-y-4">
-                     <SpeechTextarea 
-                       value={textAnswer}
-                       onChange={setTextAnswer}
-                       placeholder="Type your answer or use microphone..."
-                     />
-                     <Button 
-                       size="lg" 
-                       className="w-full text-lg" 
-                       disabled={!textAnswer.trim()}
-                       onClick={handleSubmit}
-                     >
-                       Submit Answer
-                     </Button>
+                     {hasSubmitted ? (
+                         <div className="flex flex-col gap-4 animate-in fade-in">
+                             <div className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-4 py-3 rounded-lg flex items-center justify-between">
+                                 <span className="font-bold flex items-center gap-2">
+                                     <div className="h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                     Intermission Room
+                                 </span>
+                                 <span className="text-sm">Wait for others...</span>
+                             </div>
+                             <IntermissionCanvas />
+                         </div>
+                     ) : (
+                         <div className="space-y-4">
+                             <SpeechTextarea 
+                               value={textAnswer}
+                               onChange={setTextAnswer}
+                               placeholder="Type your answer or use microphone..."
+                             />
+                             <Button 
+                               size="lg" 
+                               className="w-full text-lg" 
+                               disabled={!textAnswer.trim()}
+                               onClick={handleSubmit}
+                             >
+                               Submit Answer
+                             </Button>
+                         </div>
+                     )}
                   </div>
 
                  {/* Status Messages */}

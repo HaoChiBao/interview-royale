@@ -20,7 +20,16 @@ export default function LobbyPage() {
   
   const roomCode = useGameStore(s => s.roomCode);
   const phase = useGameStore(s => s.phase);
+  const me = useGameStore(s => s.me);
   const others = useGameStore(s => s.others);
+  const gameSettings = useGameStore(s => s.gameSettings);
+  const isReady = useGameStore(s => s.isReady);
+
+  const votes = useGameStore(s => s.votes);
+  const isChoosingSettings = useGameStore(s => s.isChoosingSettings);
+  const chosenSettings = useGameStore(s => s.chosenSettings);
+
+  const [spinResult, setSpinResult] = useState<number | null>(null);
 
   // Sync phase
   useEffect(() => {
@@ -28,6 +37,28 @@ export default function LobbyPage() {
       router.push(`/room/${code}/round`);
     }
   }, [phase, code, router]);
+
+  // Handle animation
+  useEffect(() => {
+      if (isChoosingSettings && chosenSettings) {
+          // Play animation
+          let interval: NodeJS.Timeout;
+          let count = 0;
+          const options = chosenSettings.all_votes;
+          
+          interval = setInterval(() => {
+             const random = options[Math.floor(Math.random() * options.length)];
+             setSpinResult(random);
+             count++;
+             if (count > 20) { // 2 seconds roughly
+                 clearInterval(interval);
+                 setSpinResult(chosenSettings.num_rounds);
+             }
+          }, 100);
+
+          return () => clearInterval(interval);
+      }
+  }, [isChoosingSettings, chosenSettings]);
 
     // Acquire media and connect socket
     useEffect(() => {
@@ -47,13 +78,9 @@ export default function LobbyPage() {
       }
 
       // Connect & Join
-      // We rely on socket.ts singleton checks, but we should join only once.
-      // But socket.ts `connect()` is safe.
       socketClient.connect();
       
       if (myName) {
-         // Add a small delay or check connection? 
-         // socket.ts queue handles it.
          socketClient.join(myName);
       }
   
@@ -63,12 +90,17 @@ export default function LobbyPage() {
 
       return () => {
         mounted = false;
-        // Do NOT close socket here on unmount of PAGE if we want it to persist?
-        // Actually we do want to close if we leave the lobby?
-        // But Next.js remounts.
-        // Let's NOT cleanup socket here, rely on singleton.
       };
     }, [code]);
+
+  const updateSettings = (partial: { num_rounds?: number }) => {
+      // Logic constraint: 1-5
+      if (partial.num_rounds !== undefined) {
+          if (partial.num_rounds < 1) partial.num_rounds = 1;
+          if (partial.num_rounds > 5) partial.num_rounds = 5;
+      }
+      socketClient.send("update_settings", { settings: { ...gameSettings, ...partial } });
+  };
 
   const handleStart = () => {
     socketClient.startGame();
@@ -83,10 +115,25 @@ export default function LobbyPage() {
     return <div className="p-10 text-center">Loading Room...</div>;
   }
 
+  // Calculate my vote
+  const myVote = (me && votes && votes[me.name]) || 3;
+
   return (
-    <main className="min-h-screen flex flex-col p-4 md:p-8 bg-white text-zinc-900">
+    <main className="min-h-screen flex flex-col p-4 md:p-8 bg-white text-zinc-900 overflow-hidden relative">
       <DebugLogButton />
       {localStream && <VideoBroadcaster stream={localStream} />}
+
+      {/* Animation Overlay */}
+      {isChoosingSettings && (
+          <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center text-white backdrop-blur-sm animate-in fade-in duration-300">
+              <h2 className="text-3xl font-bold mb-8 animate-pulse text-indigo-400">Choosing Settings...</h2>
+              <div className="bg-white text-black text-9xl font-black p-12 rounded-3xl shadow-2xl min-w-[300px] text-center">
+                  {spinResult}
+              </div>
+              <p className="mt-8 text-xl opacity-80">Randomly selected from player votes!</p>
+          </div>
+      )}
+
       <header className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold">Lobby</h1>
@@ -107,29 +154,53 @@ export default function LobbyPage() {
       </section>
 
       <footer className="flex justify-center flex-col items-center gap-4 py-8 border-t bg-gray-50 p-4 rounded-xl shadow-sm">
-        <div className="flex gap-4 items-center">
-          <div className="text-sm text-muted-foreground mr-4">
-             Waiting for host to start... (You are host)
-          </div>
-          <Button 
-            size="lg" 
-            className="w-48 text-lg font-bold shadow-lg shadow-indigo-500/20"
-            onClick={handleStart}
-          >
-            <Play className="w-5 h-5 mr-2" />
-            Start Game
-          </Button>
-        </div>
-        
-        <div className="flex gap-8 text-sm text-muted-foreground">
-          <div className="flex flex-col items-center">
-            <span className="font-semibold text-foreground">Mode</span>
-            <span>Behavioural</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="font-semibold text-foreground">Round Time</span>
-            <span>60s</span>
-          </div>
+        <div className="flex flex-col md:flex-row gap-8 items-center w-full max-w-4xl">
+           
+           {/* Game Settings Card - High Contrast */}
+            <div className="bg-white border-2 border-zinc-200 p-6 rounded-xl flex-1 w-full shadow-lg">
+                <h3 className="font-bold text-sm uppercase text-zinc-500 mb-4 tracking-wider">Your Vote</h3>
+                <div className="flex items-center justify-between">
+                    <span className="font-medium text-lg">Number of Rounds</span>
+                    <div className="flex items-center gap-3">
+                        <Button 
+                        variant="outline" size="icon" className="h-10 w-10 rounded-full border-2"
+                        onClick={() => updateSettings({ num_rounds: myVote - 1 })}
+                        disabled={isChoosingSettings}
+                        > - </Button>
+                        <span className="w-12 text-center font-black text-3xl">{myVote}</span>
+                        <Button 
+                        variant="outline" size="icon" className="h-10 w-10 rounded-full border-2"
+                        onClick={() => updateSettings({ num_rounds: myVote + 1 })}
+                        disabled={isChoosingSettings}
+                        > + </Button>
+                    </div>
+                </div>
+                <p className="text-xs text-zinc-400 mt-4 text-center">
+                    Game will randomly select a vote from all players.
+                </p>
+                <div className="mt-4 flex gap-1 justify-center h-2">
+                    {Object.values(votes || {}).map((v, i) => (
+                        <div key={i} className="w-2 h-2 rounded-full bg-indigo-500/50" title={`Vote: ${v}`} />
+                    ))}
+                </div>
+            </div>
+
+            {/* Start Button Area */}
+            <div className="flex-1 w-full flex flex-col items-center justify-center gap-4">
+                 <div className="text-sm text-zinc-500">
+                    Waiting for host to start... 
+                 </div>
+                <Button 
+                    size="lg" 
+                    className="w-full max-w-sm font-bold text-xl h-16 shadow-xl shadow-indigo-500/20 rounded-2xl transition-all hover:scale-105 active:scale-95"
+                    onClick={handleStart}
+                    disabled={isChoosingSettings} 
+                >
+                    <Play className="w-6 h-6 mr-2 fill-current" />
+                    {isChoosingSettings ? "Rolling..." : "Start Game"}
+                </Button>
+            </div>
+
         </div>
       </footer>
     </main>

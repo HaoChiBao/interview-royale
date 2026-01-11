@@ -1,12 +1,12 @@
 import os
 import json
-from openai import OpenAI
+from openai import AsyncOpenAI
 import dotenv
 import random
 
 dotenv.load_dotenv()
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 async def grade_submission(submission_data, question):
     """
@@ -69,7 +69,7 @@ async def grade_submission(submission_data, question):
         """
 
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt + "\nProvide output in JSON format: {'score': int, 'feedback': str}"},

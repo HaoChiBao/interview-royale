@@ -42,10 +42,13 @@ export function VideoBroadcaster({ stream }: VideoBroadcasterProps) {
           sy = (video.videoHeight - sHeight) / 2;
         }
         
+        // Safety check if canvas is still mounted
+        if (!canvasRef.current) return;
+
         ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, size, size);
         
-        // Compress to JPEG 0.5 quality
-        const frame = canvasRef.current!.toDataURL("image/jpeg", 0.5);
+        // Compress to JPEG 0.25 quality (Reduced to lower latency)
+        const frame = canvasRef.current.toDataURL("image/jpeg", 0.25);
         socketClient.sendVideoFrame(frame);
       }
     }, 100);

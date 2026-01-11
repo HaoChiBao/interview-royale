@@ -1,121 +1,166 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useGameStore } from "@/store/useGameStore";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Crown, Sparkles, ArrowRight, Home, RefreshCw } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { socketClient } from "@/lib/socket";
-import { DebugLogButton } from "@/components/DebugLogButton";
-import { VideoBroadcaster } from "@/components/VideoBroadcaster";
-import { getMediaStream } from "@/lib/media";
-import { useState } from "react";
+import { Trophy, ArrowRight, Home } from "lucide-react";
+import { AvatarStickFigure } from "@/components/AvatarStickFigure";
+import { PlayerGrid } from "@/components/PlayerGrid";
+import { IntermissionCanvas } from "@/components/IntermissionCanvas";
 
 export default function ResultsPage() {
   const router = useRouter();
   const { code } = useParams();
-  const phase = useGameStore(s => s.phase);
-  const me = useGameStore(s => s.me);
-  const others = useGameStore(s => s.others);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  
+  const { 
+      phase, 
+      others, 
+      me, 
+      leaderboard,
+      gameSettings,
+      intermissionDuration
+  } = useGameStore();
 
-  // Acquire media for preview/broadcast even in results
+  const [timeLeft, setTimeLeft] = useState(intermissionDuration || 10);
+
   useEffect(() => {
-    let mounted = true;
-    getMediaStream(true, true).then(s => {
-      if (mounted) setLocalStream(s);
-    }).catch(() => {});
-    return () => { mounted = false; };
-  }, []);
+     if (phase === "RESULTS") {
+         setTimeLeft(intermissionDuration || 10); // Reset on mount
+         const timer = setInterval(() => {
+             setTimeLeft(prev => Math.max(0, prev - 1));
+         }, 1000);
+         return () => clearInterval(timer);
+     }
+  }, [phase, intermissionDuration]);
 
-  // Sync phase (if next round starts)
-  useEffect(() => {
-    if (phase === "ROUND") {
-      router.push(`/room/${code}/round`);
-    } else if (phase === "LOBBY") {
-       router.push(`/room/${code}`);
-    }
-  }, [phase, code, router]);
-
-  const handleNext = () => {
-    socketClient.startGame();
+  const handleNextRound = () => {
+    socketClient.send("next_round", {});
   };
 
-  const handleLobby = () => {
-    useGameStore.getState().setPhase("LOBBY");
-    router.push(`/room/${code}`);
+  const handleHome = () => {
+      // Just refresh or go to root
+      window.location.href = "/";
   };
 
-  // Sort by score
-  const allPlayers = [me, ...others].filter((p): p is NonNullable<typeof p> => !!p);
-  const sorted = [...allPlayers].sort((a, b) => (b.score || 0) - (a.score || 0));
-  const winner = sorted[0];
-
+  // Combine me and others or just use leaderboard?
+  // Leaderboard is authoritative for scores. 
+  // We can just iterate the leaderboard array.
+  
   return (
-    <main className="min-h-screen flex flex-col p-4 md:p-12 bg-zinc-50 dark:bg-zinc-950">
-      <DebugLogButton />
-      {localStream && <VideoBroadcaster stream={localStream} />}
-      <header className="text-center mb-12">
-        <h1 className="text-4xl font-extrabold mb-2">Round Results</h1>
-        <p className="text-muted-foreground">Scores provided by "AI" (RNG)</p>
+    <main className="min-h-screen flex flex-col items-center p-4 md:p-8 bg-zinc-50 text-zinc-900">
+      <header className="mb-8 text-center">
+        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-500">
+          {phase === "GAME_OVER" ? "Final Results" : "Round Results"}
+        </h1>
+        {phase !== "GAME_OVER" && (
+            <p className="text-muted-foreground mt-2">
+                Moving to next round soon...
+            </p>
+        )}
       </header>
 
-      <div className="max-w-4xl mx-auto w-full space-y-8">
-         {/* Winner Banner */}
-         {winner && winner.isMe && (
-           <div className="bg-gradient-to-r from-yellow-400/20 to-orange-400/20 border border-yellow-400/50 rounded-xl p-6 text-center animate-bounce">
-              <h2 className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 flex items-center justify-center gap-2">
-                 <Crown className="fill-current w-8 h-8" />
-                 You Won This Round!
-              </h2>
-           </div>
-         )}
-
-         {/* Leaderboard Cards */}
-         <div className="grid gap-4">
-            {sorted.map((player, index) => (
-              <Card key={player.id} className={cn("transition-all", index === 0 ? "border-yellow-400 shadow-yellow-200 dark:shadow-yellow-900/20 shadow-lg scale-[1.02]" : "hover:border-indigo-200")}>
-                <CardContent className="flex items-center p-6 gap-6">
-                   <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center text-3xl font-bold text-zinc-300">
-                      {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}
-                   </div>
-                   
-                   <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                         <h3 className="text-xl font-bold">{player.name} {player.isMe && "(You)"}</h3>
-                         {index === 0 && <Crown className="w-4 h-4 text-yellow-500 fill-yellow-500" />}
+      <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
+             {/* Intermission Canvas or Leaderboard? */}
+             {/* Requirement: "intermission room where they can use the WASD controls... On the top, there'll be a timer" */}
+             {/* We can show canvas prominently. Leaderboard can be side or overlay. */}
+             
+             <div className="order-2 md:order-1 col-span-1 md:col-span-2">
+                  {phase === "GAME_OVER" ? (
+                      <Card className="h-fit">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Trophy className="w-5 h-5 text-yellow-500" />
+                                Final Leaderboard
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                           {/* Existing leaderboard rendering */}
+                           {leaderboard.map((entry, index) => (
+                               <div key={entry.username} className={`flex items-center justify-between p-3 rounded-lg border ${index === 0 ? 'bg-yellow-50 border-yellow-200' : 'bg-white'}`}>
+                                   <div className="flex items-center gap-3">
+                                       <span className={`font-bold w-6 text-center ${index === 0 ? 'text-yellow-600' : 'text-muted-foreground'}`}>
+                                           #{index + 1}
+                                       </span>
+                                       <span className="font-medium">
+                                           {entry.username} {entry.username === me?.name && "(You)"}
+                                       </span>
+                                   </div>
+                                   <span className="font-bold text-lg">
+                                       {entry.score} pts
+                                   </span>
+                               </div>
+                           ))}
+                        </CardContent>
+                      </Card>
+                  ) : (
+                      <div className="space-y-4">
+                          <IntermissionCanvas />
+                          <div className="text-center text-sm text-muted-foreground">
+                              Round Over! Move around while you wait.
+                              <div className="mt-2 font-bold text-lg">
+                                Leaderboard: {leaderboard[0]?.username || "..."} is winning!
+                              </div>
+                          </div>
                       </div>
-                      <div className="flex gap-2 text-sm text-muted-foreground">
-                         {player.feedback?.map((f, i) => (
-                           <span key={i} className="flex items-center gap-1">
-                             <Sparkles className="w-3 h-3" /> {f}
-                           </span>
-                         ))}
-                      </div>
-                   </div>
+                  )}
+             </div>
 
-                   <div className="text-right">
-                      <div className="text-4xl font-black text-indigo-600 dark:text-indigo-400">
-                        {player.score}
-                      </div>
-                      <div className="text-xs uppercase font-bold text-muted-foreground">Points</div>
-                   </div>
-                </CardContent>
-              </Card>
-            ))}
-         </div>
+          {/* Hidden but kept for structure if needed, or remove Grid usage above. */}
+          {/* Actually we replaced the grid structure logic slightly. */}
+          {/* Let's adjust the parent container if needed. */}
+         {/* Actions / Highlights */}
+         <div className="order-1 md:order-2 flex flex-col gap-6">
+             {/* Show current winner or specific highlights later */}
+             <div className="bg-white p-6 rounded-xl shadow-sm border text-center">
+                 {leaderboard.length > 0 && (
+                     <>
+                        <div className="text-sm text-muted-foreground uppercase tracking-wider mb-2">
+                            {phase === "GAME_OVER" ? "Champion" : "Current Leader"}
+                        </div>
+                        <div className="text-2xl font-bold mb-4">
+                            {leaderboard[0].username}
+                        </div>
+                        <div className="relative h-32 w-full bg-zinc-100 rounded-lg flex items-center justify-center overflow-hidden">
+                             {/* Show Avatar of leader if possible */}
+                             <AvatarStickFigure 
+                                name={leaderboard[0].username}
+                                isMe={leaderboard[0].username === me?.name}
+                                // Hack: We don't have stream for them here unless we find them in `others`
+                                className="scale-120"
+                             />
+                        </div>
+                     </>
+                 )}
+             </div>
 
-         <div className="flex justify-center gap-4 mt-8 pt-8 border-t">
-            <Button variant="outline" size="lg" onClick={handleLobby}>
-               <Home className="w-4 h-4 mr-2" />
-               Back to Lobby
-            </Button>
-            <Button size="lg" onClick={handleNext} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-               <RefreshCw className="w-4 h-4 mr-2" />
-               Next Round
-            </Button>
+             {/* Controls */}
+             <div className="flex flex-col gap-3">
+                {phase === "GAME_OVER" ? (
+                    <Button size="lg" className="w-full text-lg" onClick={handleHome}>
+                        <Home className="w-5 h-5 mr-2" />
+                        Back to Home
+                    </Button>
+                ) : (
+                    <div className="flex flex-col gap-2 w-full">
+                        <div className="bg-zinc-100 p-3 rounded-lg text-center">
+                            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                                Next Round In
+                            </span>
+                            <span className="text-3xl font-black font-mono">
+                                {timeLeft > 0 ? timeLeft : "..."}s
+                            </span>
+                        </div>
+                        {/* Optional manual override for host or testing */}
+                         {/* <Button size="lg" className="w-full text-lg shadow-lg shadow-indigo-500/20" onClick={handleNextRound}>
+                            Next Round Immediately
+                            <ArrowRight className="w-5 h-5 ml-2" />
+                        </Button> */}
+                    </div>
+                )}
+             </div>
          </div>
       </div>
     </main>

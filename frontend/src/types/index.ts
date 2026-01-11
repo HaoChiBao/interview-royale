@@ -1,4 +1,4 @@
-export type GamePhase = "LOBBY" | "ROUND" | "GRADING" | "RESULTS";
+export type GamePhase = "LOBBY" | "ROUND" | "GRADING" | "RESULTS" | "GAME_OVER";
 
 export type GameMode = "BEHAVIOURAL" | "TECHNICAL" | "MIXED";
 
@@ -12,6 +12,8 @@ export interface Player {
   feedback?: string[];
   cameraEnabled?: boolean;
   lastVideoFrame?: string; // base64 data URI
+  x?: number;
+  y?: number;
 }
 
 export interface Question {

@@ -20,7 +20,18 @@ interface GameState {
   isReady: boolean;
   recordingBlob: Blob | null;
   recordingUrl: string | null;
+
+  // New Features
+  leaderboard: { username: string; score: number }[];
+  gameSettings: { num_rounds: number; round_duration: number };
   
+  // Voting & Animation
+  intermissionDuration: number;
+  intermissionEndTime: number | null;
+  votes: Record<string, number>; // username -> rounds
+  isChoosingSettings: boolean;
+  chosenSettings: { num_rounds: number; all_votes: number[] } | null;
+
   // Actions
   setRoomCode: (code: string) => void;
   setMe: (name: string) => void;
@@ -34,6 +45,8 @@ interface GameState {
   setGrades: (grades: Record<string, { score: number; feedback: string[] }>) => void;
   resetRound: () => void;
   
+  setGameSettings: (settings: { num_rounds: number; round_duration: number }) => void;
+
   debugLogState: boolean;
   toggleDebugLogState: () => void;
   handleServerMessage: (msg: any) => void;
@@ -51,6 +64,14 @@ export const useGameStore = create<GameState>((set) => ({
   isReady: false,
   recordingBlob: null,
   recordingUrl: null,
+
+  leaderboard: [],
+  gameSettings: { num_rounds: 3, round_duration: 60 },
+  intermissionDuration: 10,
+  intermissionEndTime: null,
+  votes: {},
+  isChoosingSettings: false,
+  chosenSettings: null,
 
   debugLogState: false,
   toggleDebugLogState: () => set((state) => ({ debugLogState: !state.debugLogState })),
@@ -98,6 +119,8 @@ export const useGameStore = create<GameState>((set) => ({
   
   setGrades: (grades) => { /* Helper for local updates if needed */ },
 
+  setGameSettings: (settings) => set({ gameSettings: settings }),
+
   resetRound: () => set((state) => ({
     currentQuestion: null,
     roundEndTime: null,
@@ -110,9 +133,6 @@ export const useGameStore = create<GameState>((set) => ({
       switch (msg.type) {
         case "player_update":
           // msg.players is a list of {username}.
-          // Filter out me? The server logic is simple, assume "me" is managed locally by name matching?
-          // Or we just update all "others" from the list excluding me.
-          // Merge new list with existing state to preserve lastVideoFrame etc.
           const incomingUsernames = new Set(msg.players.map((p: any) => p.username));
           
           const mergedOthers = msg.players
@@ -123,31 +143,54 @@ export const useGameStore = create<GameState>((set) => ({
                     id: p.username,
                     name: p.username,
                     isMe: false,
-                    // Preserve existing state
+                // Preserve existing state
                     lastVideoFrame: existing?.lastVideoFrame,
                     cameraEnabled: existing?.cameraEnabled,
+                    hasSubmitted: existing?.hasSubmitted,
+                    score: existing?.score,
                     ...p
                 };
              });
           
           return { others: mergedOthers };
 
+        case "settings_update":
+            return { 
+                gameSettings: msg.settings,
+                votes: msg.votes || {} 
+            };
+        
+        case "settings_chosen":
+             // Trigger animation
+             return {
+                 isChoosingSettings: true,
+                 chosenSettings: { 
+                     num_rounds: msg.winner, 
+                     all_votes: msg.all_votes 
+                 }
+                 // The component will read this and start animating.
+                 // After animation, it will wait for "new_question"
+             };
+
         case "new_question":
-             // question, state="QUESTION"
              return {
                 phase: "ROUND",
+                isChoosingSettings: false, // Stop animation
                 currentQuestion: msg.question,
-                roundDuration: 60, // Server doesn't send yet
-                roundEndTime: Date.now() + 60 * 1000,
+                roundDuration: state.gameSettings.round_duration, 
+                roundEndTime: Date.now() + state.gameSettings.round_duration * 1000,
                 recordingBlob: null,
-                recordingUrl: null
+                recordingUrl: null,
+                // Reset hasSubmitted for everyone
+                me: state.me ? { ...state.me, hasSubmitted: false } : null,
+                others: state.others.map(p => ({ ...p, hasSubmitted: false }))
              };
 
         case "grading_complete":
             // msg.result = {score, feedback}
             if (state.me) {
                 return {
-                    me: { ...state.me, score: msg.result.score, feedback: msg.result.feedback }
+                    me: { ...state.me, score: msg.result.score, feedback: msg.result.feedback, hasSubmitted: true }
                 };
             }
             return {};
@@ -155,30 +198,36 @@ export const useGameStore = create<GameState>((set) => ({
         case "round_over":
              // msg.results = [ {username, score, feedback, content} ] sorted
              // We can map this to others and display leaderboard
-             const allPlayers = msg.results.map((r: any) => ({
-                 id: r.username,
-                 name: r.username,
-                 score: r.score,
-                 feedback: r.feedback,
-                 isMe: r.username === state.me?.name
-             }));
+             const leaderboard = msg.leaderboard || [];
              
              // Update others/me from this authoritative list
              // Actually, simplest is to just use this list for the results page?
              // But let's sync "others" state.
-             const newOthers = allPlayers.filter((p: any) => !p.isMe);
-             const myResult = allPlayers.find((p: any) => p.isMe);
+             const updatedOthers = state.others.map(p => {
+                 const entry = leaderboard.find((l: any) => l.username === p.name);
+                 return entry ? { ...p, score: entry.score, hasSubmitted: true } : { ...p, hasSubmitted: true }; 
+                 // Mark all as submitted since round is over
+             });
              
-             const newState: Partial<GameState> = { 
-                 phase: "RESULTS",
-                 others: newOthers
-             };
-             
-             if (myResult && state.me) {
-                 newState.me = { ...state.me, score: myResult.score, feedback: myResult.feedback };
+             const myEntry = leaderboard.find((l: any) => l.username === state.me?.name);
+             const updatedMe = state.me ? { ...state.me, hasSubmitted: true } : state.me; 
+             if (state.me && myEntry) {
+                 updatedMe !.score = myEntry.score;
              }
-             
-             return newState;
+
+             return {
+                 phase: "RESULTS",
+                 others: updatedOthers,
+                 me: updatedMe,
+                 leaderboard,
+                 intermissionEndTime: msg.intermission_end_time ? msg.intermission_end_time * 1000 : Date.now() + 120000 // Expecting seconds from python, convert to ms
+             };
+
+        case "game_over":
+             return {
+                 phase: "GAME_OVER",
+                 leaderboard: msg.leaderboard
+             };
 
         case "video_update":
             // { type: "video_update", username, frame }
@@ -190,6 +239,31 @@ export const useGameStore = create<GameState>((set) => ({
                     ? { ...p, lastVideoFrame: msg.frame }
                     : p
                 )
+            };
+
+        case "world_update":
+            // { type: "world_update", players: { username: {x, y} } }
+            const positions = msg.players;
+            
+            // Update Me
+            let newMe = state.me;
+            if (state.me && positions[state.me.name]) {
+                const myPos = positions[state.me.name];
+                newMe = { ...state.me, x: myPos.x, y: myPos.y };
+            }
+            
+            // Update Others
+            const newOthers = state.others.map(p => {
+                const pos = positions[p.name];
+                if (pos) {
+                    return { ...p, x: pos.x, y: pos.y };
+                }
+                return p;
+            });
+            
+            return {
+                me: newMe,
+                others: newOthers
             };
              
         default:
