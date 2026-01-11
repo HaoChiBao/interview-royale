@@ -436,7 +436,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 games[room_code].leader = user_id # Creator is leader
                 print(f"Created new room: {room_code} by {user_id} ({username})")
                 
-                manager.active_connections[websocket]["username"] = user_id 
+                manager.active_connections[websocket]["username"] = username 
                 manager.active_connections[websocket]["user_id"] = user_id
                 manager.active_connections[websocket]["room_code"] = room_code
                 
@@ -447,7 +447,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
                 
                 # Add to game state immediately
-                games[room_code].players[user_id] = PlayerState(user_id)
+                games[room_code].players[user_id] = PlayerState(username)
 
                 # START PHYSICS
                 await games[room_code].start_physics(room_code)
@@ -456,7 +456,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({
                     "type": "welcome",
                     "id": user_id,
-                    "username": user_id,
+                    "username": username,
                     "room_code": room_code
                 })
 
@@ -477,7 +477,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 while user_id in active_ids:
                     user_id = f"Guest{random.randint(100, 999)}"
 
-                manager.active_connections[websocket]["username"] = user_id 
+                manager.active_connections[websocket]["username"] = username 
                 manager.active_connections[websocket]["user_id"] = user_id
                 manager.active_connections[websocket]["room_code"] = room_code
                 
@@ -490,13 +490,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({
                     "type": "welcome",
                     "id": user_id, 
-                    "username": user_id, 
+                    "username": username, 
                     "room_code": room_code
                 })
                 
                 # Add to game state immediately using ID
                 if user_id not in games[room_code].players:
-                    games[room_code].players[user_id] = PlayerState(user_id)
+                    games[room_code].players[user_id] = PlayerState(username)
 
                 # Send current settings to the new joiner
                 game = games[room_code]

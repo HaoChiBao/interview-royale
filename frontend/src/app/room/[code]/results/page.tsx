@@ -11,6 +11,8 @@ import { AvatarStickFigure } from "@/components/AvatarStickFigure";
 import { PlayerGrid } from "@/components/PlayerGrid";
 import { IntermissionCanvas } from "@/components/IntermissionCanvas";
 import { LeaderboardOverlay } from "@/components/LeaderboardOverlay";
+import titleImage from "@/assets/title.png";
+import { getMediaStream } from "@/lib/media";
 
 export default function ResultsPage() {
     const router = useRouter();
@@ -25,148 +27,154 @@ export default function ResultsPage() {
         intermissionDuration
     } = useGameStore();
 
-    const [timeLeft, setTimeLeft] = useState(intermissionDuration || 10);
+    const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
+    // Acquire media for "Me" avatar
     useEffect(() => {
-        if (phase === "RESULTS") {
-            setTimeLeft(intermissionDuration || 10); // Reset on mount
-            const timer = setInterval(() => {
-                setTimeLeft(prev => Math.max(0, prev - 1));
-            }, 1000);
-            return () => clearInterval(timer);
-        }
-    }, [phase, intermissionDuration]);
+        let mounted = true;
+        getMediaStream(true, true).then(s => {
+            if (mounted) setLocalStream(s);
+        }).catch(e => console.error(e));
 
-    const handleNextRound = () => {
-        socketClient.send("next_round", {});
-    };
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     const handleHome = () => {
-        // Just refresh or go to root
         window.location.href = "/";
     };
 
-    // Combine me and others or just use leaderboard?
-    // Leaderboard is authoritative for scores. 
-    // We can just iterate the leaderboard array.
+    // Calculate podium and list
+    // Leaderboard has { username, score }
+    // We need to map this to Player objects from `others` and `me` to get video frames
+    const fullLeaderboard = leaderboard.map((entry) => {
+        const isMe = entry.username === me?.name;
+        // Find player object
+        const player = isMe ? me : others.find(p => p.name === entry.username);
+        return {
+            ...entry,
+            isMe,
+            playerObj: player
+        };
+    });
+
+    const top3 = fullLeaderboard.slice(0, 3);
+    const rest = fullLeaderboard.slice(3);
+
+    const myScore = leaderboard.find(l => l.username === me?.name)?.score || 0;
 
     return (
-        <main className="min-h-screen flex flex-col items-center p-4 md:p-8 bg-zinc-50 text-zinc-900">
-            <LeaderboardOverlay />
-            <header className="mb-8 text-center">
-                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-500">
-                    {phase === "GAME_OVER" ? "Final Results" : "Round Results"}
-                </h1>
-                {phase !== "GAME_OVER" && (
-                    <p className="text-muted-foreground mt-2">
-                        Moving to next round soon...
-                    </p>
-                )}
-            </header>
+        <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-white text-zinc-900 overflow-hidden relative">
+            {/* Logo Header */}
+            <div className="mb-4 animate-in slide-in-from-top-10 fade-in duration-700">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={titleImage.src} alt="Interview Royale" className="h-24 md:h-32 object-contain" />
+            </div>
 
-            <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Intermission Canvas or Leaderboard? */}
-                {/* Requirement: "intermission room where they can use the WASD controls... On the top, there'll be a timer" */}
-                {/* We can show canvas prominently. Leaderboard can be side or overlay. */}
+            {/* My Score */}
+            <h2 className="text-xl md:text-2xl font-bold text-zinc-800 mb-12 animate-in fade-in duration-1000 delay-300">
+                Your Score: <span className="text-indigo-500">{myScore}pts</span>
+            </h2>
 
-                <div className="order-2 md:order-1 col-span-1 md:col-span-2">
-                    {phase === "GAME_OVER" ? (
-                        <Card className="h-fit">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Trophy className="w-5 h-5 text-yellow-500" />
-                                    Final Leaderboard
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {/* Existing leaderboard rendering */}
-                                {leaderboard.map((entry, index) => (
-                                    <div key={entry.username} className={`flex items-center justify-between p-3 rounded-lg border ${index === 0 ? 'bg-yellow-50 border-yellow-200' : 'bg-white'}`}>
-                                        <div className="flex items-center gap-3">
-                                            <span className={`font-bold w-6 text-center ${index === 0 ? 'text-yellow-600' : 'text-muted-foreground'}`}>
-                                                #{index + 1}
-                                            </span>
-                                            <span className="font-medium">
-                                                {entry.username} {entry.username === me?.name && "(You)"}
-                                            </span>
-                                        </div>
-                                        <span className="font-bold text-lg">
-                                            {entry.score} pts
-                                        </span>
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <div className="space-y-4">
-                            <IntermissionCanvas />
-                            <div className="text-center text-sm text-muted-foreground">
-                                Round Over! Move around while you wait.
-                                <div className="mt-2 font-bold text-lg">
-                                    Leaderboard: {leaderboard[0]?.username || "..."} is winning!
+            {/* Podium Section */}
+            <div className="flex items-end justify-center gap-4 md:gap-8 mb-16 w-full max-w-4xl px-4 min-h-[300px]">
+                {/* 2nd Place */}
+                {top3[1] && (
+                    <div className="flex flex-col items-center animate-in slide-in-from-bottom-20 fade-in duration-700 delay-500 z-10">
+                        <div className="relative group">
+                            <div className="absolute -inset-4 bg-slate-200/50 rounded-full blur-xl group-hover:bg-slate-300/50 transition-colors" />
+                            <div className="bg-white p-3 rounded-xl shadow-xl -rotate-6 border-4 border-slate-300 relative z-10 w-[180px] md:w-[220px] flex flex-col items-center">
+                                <AvatarStickFigure 
+                                    name={top3[1].username}
+                                    isMe={top3[1].isMe}
+                                    stream={top3[1].isMe ? localStream : null}
+                                    lastVideoFrame={top3[1].playerObj?.lastVideoFrame}
+                                    cameraEnabled={true}
+                                    className="scale-90"
+                                />
+                                <div className="mt-2 text-center">
+                                    <div className="text-4xl font-black text-slate-300">#2</div>
+                                    <div className="font-bold text-slate-700 leading-tight">{top3[1].username}</div>
+                                    <div className="text-sm font-bold text-slate-400">{top3[1].score}pts</div>
                                 </div>
                             </div>
                         </div>
-                    )}
-                </div>
-
-                {/* Hidden but kept for structure if needed, or remove Grid usage above. */}
-                {/* Actually we replaced the grid structure logic slightly. */}
-                {/* Let's adjust the parent container if needed. */}
-                {/* Actions / Highlights */}
-                <div className="order-1 md:order-2 flex flex-col gap-6">
-                    {/* Show current winner or specific highlights later */}
-                    <div className="bg-white p-6 rounded-xl shadow-sm border text-center">
-                        {leaderboard.length > 0 && (
-                            <>
-                                <div className="text-sm text-muted-foreground uppercase tracking-wider mb-2">
-                                    {phase === "GAME_OVER" ? "Champion" : "Current Leader"}
-                                </div>
-                                <div className="text-2xl font-bold mb-4">
-                                    {leaderboard[0].username}
-                                </div>
-                                <div className="relative h-32 w-full bg-zinc-100 rounded-lg flex items-center justify-center overflow-hidden">
-                                    {/* Show Avatar of leader if possible */}
-                                    <AvatarStickFigure
-                                        name={leaderboard[0].username}
-                                        isMe={leaderboard[0].username === me?.name}
-                                        // Hack: We don't have stream for them here unless we find them in `others`
-                                        className="scale-120"
-                                    />
-                                </div>
-                            </>
-                        )}
                     </div>
+                )}
 
-                    {/* Controls */}
-                    <div className="flex flex-col gap-3">
-                        {phase === "GAME_OVER" ? (
-                            <Button size="lg" className="w-full text-lg" onClick={handleHome}>
-                                <Home className="w-5 h-5 mr-2" />
-                                Back to Home
-                            </Button>
-                        ) : (
-                            <div className="flex flex-col gap-2 w-full">
-                                <div className="bg-zinc-100 p-3 rounded-lg text-center">
-                                    <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-                                        Next Round In
-                                    </span>
-                                    <span className="text-3xl font-black font-mono">
-                                        {timeLeft > 0 ? timeLeft : "..."}s
-                                    </span>
+                {/* 1st Place - Center */}
+                {top3[0] && (
+                    <div className="flex flex-col items-center animate-in slide-in-from-bottom-32 fade-in duration-700 delay-700 z-20 -mx-4 md:mx-0 order-first md:order-none mb-8 md:mb-0">
+                        <div className="relative group">
+                             <div className="absolute -inset-4 bg-yellow-200/50 rounded-full blur-2xl group-hover:bg-yellow-300/50 transition-colors animate-pulse" />
+                             <div className="bg-white p-4 rounded-2xl shadow-2xl scale-110 border-4 border-yellow-400 relative z-10 w-[200px] md:w-[260px] flex flex-col items-center">
+                                <div className="absolute -top-6 text-5xl animate-bounce">👑</div>
+                                <AvatarStickFigure 
+                                    name={top3[0].username}
+                                    isMe={top3[0].isMe}
+                                    stream={top3[0].isMe ? localStream : null}
+                                    lastVideoFrame={top3[0].playerObj?.lastVideoFrame}
+                                    cameraEnabled={true}
+                                />
+                                <div className="mt-4 text-center">
+                                    <div className="text-5xl font-black text-yellow-400">#1</div>
+                                    <div className="text-xl font-bold text-zinc-800 leading-tight">{top3[0].username}</div>
+                                    <div className="font-bold text-yellow-600">{top3[0].score}pts</div>
                                 </div>
-                                {/* Optional manual override for host or testing */}
-                                {me?.isLeader && (
-                                    <Button size="lg" className="w-full text-lg shadow-lg shadow-indigo-500/20" onClick={() => socketClient.send("skip_intermission", {})}>
-                                        Skip Intermission 👑
-                                        <ArrowRight className="w-5 h-5 ml-2" />
-                                    </Button>
-                                )}
+                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 3rd Place */}
+                {top3[2] && (
+                    <div className="flex flex-col items-center animate-in slide-in-from-bottom-20 fade-in duration-700 delay-600 z-10">
+                        <div className="relative group">
+                            <div className="absolute -inset-4 bg-orange-200/50 rounded-full blur-xl group-hover:bg-orange-300/50 transition-colors" />
+                            <div className="bg-white p-3 rounded-xl shadow-xl rotate-6 border-4 border-orange-300 relative z-10 w-[180px] md:w-[220px] flex flex-col items-center">
+                                <AvatarStickFigure 
+                                    name={top3[2].username}
+                                    isMe={top3[2].isMe}
+                                    stream={top3[2].isMe ? localStream : null}
+                                    lastVideoFrame={top3[2].playerObj?.lastVideoFrame}
+                                    cameraEnabled={true}
+                                    className="scale-90"
+                                />
+                                <div className="mt-2 text-center">
+                                    <div className="text-4xl font-black text-orange-300">#3</div>
+                                    <div className="font-bold text-slate-700 leading-tight">{top3[2].username}</div>
+                                    <div className="text-sm font-bold text-orange-400">{top3[2].score}pts</div>
+                                </div>
                             </div>
-                        )}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
+
+            {/* Remaining List */}
+            {rest.length > 0 && (
+                <div className="w-full max-w-lg space-y-2 mb-8 animate-in fade-in duration-700 delay-1000">
+                    {rest.map((entry, idx) => (
+                        <div key={entry.username} className="flex items-center justify-between bg-zinc-100 p-3 rounded-lg border border-zinc-200">
+                             <div className="flex items-center gap-4">
+                                <span className="font-black text-zinc-400 text-lg">#{idx + 4}</span>
+                                <span className="font-bold text-zinc-700">{entry.username}</span>
+                             </div>
+                             <span className="font-bold text-zinc-500">{entry.score}pts</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Back Button */}
+            <Button 
+                onClick={handleHome}
+                className="bg-zinc-900 text-white hover:bg-zinc-800 text-lg px-8 py-6 rounded-xl font-bold shadow-xl transition-transform hover:scale-105 active:scale-95 animate-in fade-in duration-700 delay-1000"
+            >
+                Back To Home
+            </Button>
+
         </main>
     );
 }
