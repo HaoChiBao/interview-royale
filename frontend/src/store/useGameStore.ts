@@ -45,6 +45,8 @@ interface GameState {
   setRecording: (blob: Blob | null) => void;
   setGrades: (grades: Record<string, { score: number; feedback: string[] }>) => void;
   resetRound: () => void;
+  setSubmitted: (submitted: boolean) => void;
+  setHasSubmitted: () => void;
 
   setGameSettings: (settings: { num_rounds: number; round_duration: number }) => void;
 
@@ -128,6 +130,15 @@ export const useGameStore = create<GameState>((set) => ({
     roundEndTime: null,
     recordingBlob: null,
     recordingUrl: null,
+  })),
+
+  setSubmitted: (submitted) => set((state) => ({
+    me: state.me ? { ...state.me, hasSubmitted: submitted } : null
+  })),
+
+  // Helper for optimistic optimistic updates
+  setHasSubmitted: () => set((state) => ({ 
+      me: state.me ? { ...state.me, hasSubmitted: true } : null 
   })),
 
   handleServerMessage: (msg: any) => {

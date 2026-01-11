@@ -56,16 +56,16 @@ export default function RoundPage() {
       setIsCalculating(false);
   }, [question]);
 
-  // Handle Submission Transition
-  useEffect(() => {
-      if (hasSubmitted) {
-          setIsCalculating(true);
-          const timer = setTimeout(() => {
-              setIsCalculating(false);
-          }, 3000); // 3 seconds calculating
-          return () => clearTimeout(timer);
-      }
-  }, [hasSubmitted]);
+  // Handle Submission Transition - IMMEDIATE now
+  // useEffect(() => {
+  //     if (hasSubmitted) {
+  //         setIsCalculating(true);
+  //         const timer = setTimeout(() => {
+  //             setIsCalculating(false);
+  //         }, 3000); // 3 seconds calculating
+  //         return () => clearTimeout(timer);
+  //     }
+  // }, [hasSubmitted]);
 
   // Acquire media
   useEffect(() => {
@@ -106,16 +106,27 @@ export default function RoundPage() {
   // Handle timer expire
   const handleExpire = () => {
     // Auto submit what we have
+    // OPTIMISTIC UPDATE: Immediate transition
+    useGameStore.getState().setHasSubmitted();
     socketClient.submit(textAnswer || "Time expired, no answer.");
   };
 
   const handleSubmit = () => {
-    if (textAnswer.trim()) {
-      socketClient.submit(textAnswer);
-    } else {
-      socketClient.submit("No answer provided.");
-    }
+      // OPTIMISTIC UPDATE: Immediate transition
+      useGameStore.getState().setHasSubmitted();
+      
+      if (textAnswer.trim()) {
+        socketClient.submit(textAnswer);
+      } else {
+        socketClient.submit("No answer provided.");
+      }
   };
+
+  const setVideoRef = React.useCallback((el: HTMLVideoElement | null) => {
+      if (el && localStream) {
+          el.srcObject = localStream;
+      }
+  }, [localStream]);
 
   if (!question) {
     return <div className="p-10 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
@@ -123,10 +134,13 @@ export default function RoundPage() {
 
   return (
     <main className="min-h-screen flex flex-col p-4 text-zinc-900 overflow-hidden font-sans relative">
+      {/* BROADCASTER: Always active if we have a stream */}
+      {localStream && <VideoBroadcaster stream={localStream} />}
+
       {hasSubmitted && <IntermissionCanvas className="z-0" localStream={localStream} />}
       
-      {/* 4. Calculating / Analyzing Overlay */}
-      {hasSubmitted && isCalculating && (
+      {/* 4. Calculating / Analyzing Overlay - DISABLED for immediate intermission */}
+      {/* {hasSubmitted && isCalculating && (
           <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center text-white backdrop-blur-md animate-in fade-in duration-300">
                <div className="flex flex-col items-center gap-6 z-10">
                    <div className="relative">
@@ -138,17 +152,16 @@ export default function RoundPage() {
                        <p className="text-zinc-400">Calculating complexity and efficiency score</p>
                    </div>
                </div>
-               {/* Matrix background effect */}
+               
                <div className="absolute inset-0 opacity-20" 
-                  style={{ backgroundImage: "linear-gradient(0deg, transparent 24%, rgba(32, 255, 77, .1) 25%, rgba(32, 255, 77, .1) 26%, transparent 27%, transparent 74%, rgba(32, 255, 77, .1) 75%, rgba(32, 255, 77, .1) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(32, 255, 77, .1) 25%, rgba(32, 255, 77, .1) 26%, transparent 27%, transparent 74%, rgba(32, 255, 77, .1) 75%, rgba(32, 255, 77, .1) 76%, transparent 77%, transparent)", backgroundSize: "50px 50px" }}
+                  style={{ backgroundImage: "linear-gradient(0deg, transparent 24%, rgba(32, 255, 77, .1) 25%, rgba(32, 255, 77, .1) 26%, transparent 27%, transparent 74%, rgba(32, 255, 77, .1) 75%, rgba(32, 255, 77, .1) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(32, 255, 77, .1) 25%, rgba(32, 255, 77, .1) 26%, transparent 27%, transparent 74%, rgba(32, 255, 77, .1) 75%, rgba(32, 255, 77, .1) 76%, transparent 77%, transparent), backgroundSize: "50px 50px" }}
                />
           </div>
-      )}
+      )} */}
 
       {/* Hide main content if submitted (to show clean IntermissionCanvas) */}
       {!hasSubmitted && (
           <div className="relative z-10 flex flex-col flex-1 w-full max-w-7xl mx-auto">
-            {localStream && <VideoBroadcaster stream={localStream} />}
             
             {/* 1. Header Section: Question & Timer */}
             <div className="w-full mb-6">
@@ -176,11 +189,11 @@ export default function RoundPage() {
                  {/* Left: User Video (Self View) */}
                  <div className="bg-zinc-100 rounded-2xl overflow-hidden border border-zinc-200 relative shadow-inner flex items-center justify-center">
                       {localStream ? (
-                           <video 
-                              ref={videoRef}
-                              autoPlay muted playsInline 
-                              className="w-full h-full object-cover scale-x-[-1]"
-                           />
+                       <video 
+                          ref={setVideoRef}
+                          autoPlay muted playsInline 
+                          className="w-full h-full object-cover scale-x-[-1]"
+                       />
                       ) : (
                           <div className="text-zinc-400 font-medium">Camera off or loading...</div>
                       )}

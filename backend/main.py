@@ -31,6 +31,7 @@ class PlayerState:
         self.is_moving = False
         self.facing_right = True
         self.is_chatting = False # New state
+        self.has_submitted = False # Track submission status
         self.last_update = time.time()
 
 class Game:
@@ -112,7 +113,9 @@ class Game:
                     "username": p.username,
                     "is_moving": p.is_moving,
                     "facing_right": p.facing_right,
-                    "is_chatting": p.is_chatting
+                    "facing_right": p.facing_right,
+                    "is_chatting": p.is_chatting,
+                    "has_submitted": p.has_submitted
                 }
             
             if state_snapshot:
@@ -148,7 +151,12 @@ class Game:
         self.state = "QUESTION"
         self.current_round += 1
         self.current_question = get_random_question()
+        self.current_question = get_random_question()
         self.submissions = {}
+        # Reset submission status for all players
+        for p in self.players.values():
+            p.has_submitted = False
+            
         self.round_end_time = time.time() + self.settings["round_duration"]
         
         # Ensure physics loop is running for this round
@@ -657,6 +665,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 
                 # Notify user receipt (optional, or just wait for round_over)
                 # await websocket.send_json({ "type": "submission_received" })
+                
+                # Update player state
+                if user_id in game.players:
+                    game.players[user_id].has_submitted = True
                 
                 # Check for round end
                 room_players_count = len([

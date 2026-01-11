@@ -23,8 +23,8 @@ class GameSocket {
   //     return wsUrl + "/ws";
   //   }
 
-  private url: string = 'wss://interview-royale-production.up.railway.app/ws';
-  // private url: string = 'ws://localhost:8000/ws';
+  // private url: string = 'wss://interview-royale-production.up.railway.app/ws';
+  private url: string = 'ws://localhost:8000/ws';
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private messageQueue: string[] = [];
 
@@ -108,6 +108,7 @@ class GameSocket {
   }
 
   submit(content: string) {
+    useGameStore.getState().setSubmitted(true);
     this.send("submit", { content });
   }
 
