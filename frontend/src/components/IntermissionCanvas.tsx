@@ -251,8 +251,8 @@ export function IntermissionCanvas() {
                         style={{ 
                             transform: `translate(${screenX}px, ${screenY}px)`,
                             // Center the pivot
-                            marginLeft: -30, // Half of width (approx)
-                            marginTop: -40   // Half of height
+                            marginLeft: -112, // Half of width (224/2)
+                            marginTop: -112   // Half of height (224/2)
                         }}
                      >
                         <AvatarStickFigure
@@ -261,6 +261,8 @@ export function IntermissionCanvas() {
                             stream={isMe ? stream : null}
                             cameraEnabled={true}
                             lastVideoFrame={player?.lastVideoFrame}
+                            isMoving={player?.isMoving}
+                            facingRight={player?.facingRight}
                         />
                      </div>
                  );

@@ -259,14 +259,26 @@ export const useGameStore = create<GameState>((set) => ({
             let newMe = state.me;
             if (state.me && positions[state.me.id]) {
                 const myPos = positions[state.me.id];
-                newMe = { ...state.me, x: myPos.x, y: myPos.y };
+                newMe = { 
+                    ...state.me, 
+                    x: myPos.x, 
+                    y: myPos.y,
+                    isMoving: myPos.is_moving,
+                    facingRight: myPos.facing_right
+                };
             }
             
             // Update Others
             const newOthers = state.others.map(p => {
                 const pos = positions[p.id];
                 if (pos) {
-                    return { ...p, x: pos.x, y: pos.y };
+                    return { 
+                        ...p, 
+                        x: pos.x, 
+                        y: pos.y,
+                        isMoving: pos.is_moving,
+                        facingRight: pos.facing_right
+                    };
                 }
                 return p;
             });
