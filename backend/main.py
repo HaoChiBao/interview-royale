@@ -81,9 +81,9 @@ class Game:
                 p.x += dx
                 p.y += dy
                 
-                # Boundaries (800x600 virtual canvas)
-                p.x = max(0, min(800, p.x))
-                p.y = max(0, min(600, p.y))
+                # Infinite boundaries
+                # p.x = max(0, min(800, p.x))
+                # p.y = max(0, min(600, p.y))
                 
                 state_snapshot[name] = {"x": p.x, "y": p.y}
             

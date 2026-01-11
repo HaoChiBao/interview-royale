@@ -161,13 +161,40 @@ export function IntermissionCanvas() {
         return () => cancelAnimationFrame(animationFrameId);
     }, []); // Run ONCE on mount
 
+    // Track viewport size for centering
+    const [viewport, setViewport] = useState({ width: 0, height: 0 });
+
+    useEffect(() => {
+        const handleResize = () => {
+            setViewport({ width: window.innerWidth, height: window.innerHeight });
+        };
+        handleResize(); // Init
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    // Helper to get my current visual position
+    const myVisualPos = me && visualState[me.name] ? visualState[me.name] : { x: 400, y: 300 };
+    
+    // Calculate Camera Offset
+    // We want 'myVisualPos' to be at center of screen
+    // Offset = Center - PlayerPos
+    // World 0,0 would be at Center + Offset
+    const centerX = viewport.width / 2;
+    const centerY = viewport.height / 2;
+    
+    const camOffsetX = centerX - myVisualPos.x;
+    const camOffsetY = centerY - myVisualPos.y;
+
     return (
         <div className="fixed inset-0 z-50 bg-slate-50 overflow-hidden">
              {/* Grid Background */}
              <div className="absolute inset-0 opacity-10 pointer-events-none" 
                   style={{ 
                       backgroundImage: "linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)", 
-                      backgroundSize: "50px 50px" 
+                      backgroundSize: "50px 50px",
+                      // Move background opposite to player movement (or rather, fixed to world space)
+                      backgroundPosition: `${camOffsetX}px ${camOffsetY}px` 
                   }} 
              />
 
@@ -187,12 +214,13 @@ export function IntermissionCanvas() {
              </div>
              
              {/* DEBUG OVERLAY */}
-             <div className="absolute top-20 left-8 bg-black/50 text-white text-xs p-2 pointer-events-none max-w-sm overflow-hidden">
+             {/* <div className="absolute top-20 left-8 bg-black/50 text-white text-xs p-2 pointer-events-none max-w-sm overflow-hidden">
                  Me: {me?.name} (Submitted: {String(me?.hasSubmitted)})<br/>
                  Others: {others.length}<br/>
                  Visual: {Object.keys(visualState).join(", ")}<br/>
-                 Pos: {me?.name && JSON.stringify(visualState[me.name])}
-             </div>
+                 Pos: {me?.name && JSON.stringify(visualState[me.name])}<br/>
+                 Cam: {Math.round(camOffsetX)}, {Math.round(camOffsetY)}
+             </div> */}
 
              {/* Render Players */}
              {Object.entries(visualState).map(([name, pos]) => {
@@ -201,14 +229,17 @@ export function IntermissionCanvas() {
                  
                  // Only show if submitted (or if it's me)
                  if (!isMe && !player?.hasSubmitted) return null;
-                 // if (isMe && !me?.hasSubmitted) return null; // Relaxed filter: Always show Me
                  
+                 // Apply camera offset
+                 const screenX = pos.x + camOffsetX;
+                 const screenY = pos.y + camOffsetY;
+
                  return (
                      <div 
                         key={name}
-                        className="absolute" // REMOVED transition-transform will-change-transform
+                        className="absolute" 
                         style={{ 
-                            transform: `translate(${pos.x}px, ${pos.y}px)`,
+                            transform: `translate(${screenX}px, ${screenY}px)`,
                             // Center the pivot
                             marginLeft: -30, // Half of width (approx)
                             marginTop: -40   // Half of height
@@ -224,6 +255,91 @@ export function IntermissionCanvas() {
                      </div>
                  );
              })}
+
+             {/* MINIMAP */}
+             {(() => {
+                 // Identify all players to show on minimap
+                 const minimapPlayers = [];
+                 if (me) minimapPlayers.push(me);
+                 others.forEach(p => {
+                     if (p.hasSubmitted) minimapPlayers.push(p);
+                 });
+                 
+                 if (minimapPlayers.length === 0) return null;
+
+                 // Calculate bounds
+                 let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                 minimapPlayers.forEach(p => {
+                     // Use visual state if available for smoothness, otherwise raw
+                     const v = visualState[p.name] || {x: p.x || 400, y: p.y || 300};
+                     if (v.x < minX) minX = v.x;
+                     if (v.x > maxX) maxX = v.x;
+                     if (v.y < minY) minY = v.y;
+                     if (v.y > maxY) maxY = v.y;
+                 });
+                 
+                 // Add padding
+                 const PAD = 100; // World units
+                 minX -= PAD; maxX += PAD;
+                 minY -= PAD; maxY += PAD;
+
+                 // Enforce minimum size (e.g. 2000x2000) so it doesn't zoom in crazy close
+                 const MIN_SIZE = 2000;
+                 const w = maxX - minX;
+                 const h = maxY - minY;
+                 
+                 if (w < MIN_SIZE) {
+                     const diff = MIN_SIZE - w;
+                     minX -= diff/2;
+                     maxX += diff/2;
+                 }
+                 if (h < MIN_SIZE) {
+                     const diff = MIN_SIZE - h;
+                     minY -= diff/2;
+                     maxY += diff/2;
+                 }
+
+                 const finalW = maxX - minX;
+                 const finalH = maxY - minY;
+
+                 // Map size
+                 const mapSize = 140; 
+                 
+                 return (
+                     <div className="absolute bottom-6 right-6 w-[140px] h-[140px] bg-white/90 border-2 border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden pointer-events-none">
+                         {/* Grid inside map */}
+                         <div className="absolute inset-0 opacity-20" 
+                              style={{ 
+                                  backgroundImage: "linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)", 
+                                  backgroundSize: "14px 14px" 
+                              }} 
+                         />
+                         
+                         {minimapPlayers.map(p => {
+                             const v = visualState[p.name] || {x: p.x || 400, y: p.y || 300};
+                             const isMe = p.name === me?.name;
+                             
+                             // Normalize 0..1
+                             const nx = (v.x - minX) / finalW;
+                             const ny = (v.y - minY) / finalH;
+                             
+                             return (
+                                 <div 
+                                    key={p.name}
+                                    className={cn(
+                                        "absolute w-2 h-2 rounded-full -translate-x-1/2 -translate-y-1/2",
+                                        isMe ? "bg-green-500 z-10 w-2.5 h-2.5 ring-1 ring-white" : "bg-indigo-400"
+                                    )}
+                                    style={{
+                                        left: `${nx * 100}%`,
+                                        top: `${ny * 100}%`
+                                    }}
+                                 />
+                             );
+                         })}
+                     </div>
+                 );
+             })()}
         </div>
     );
 }

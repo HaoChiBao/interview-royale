@@ -24,7 +24,7 @@ export function VideoBroadcaster({ stream }: VideoBroadcasterProps) {
     const interval = setInterval(() => {
       if (video.readyState === video.HAVE_ENOUGH_DATA) {
         // Center crop to square (1:1)
-        const size = 150;
+        const size = 140;
         const vRatio = video.videoWidth / video.videoHeight;
         let sx, sy, sWidth, sHeight;
 
@@ -47,11 +47,11 @@ export function VideoBroadcaster({ stream }: VideoBroadcasterProps) {
 
         ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, size, size);
         
-        // Compress to JPEG 0.25 quality (Reduced to lower latency)
-        const frame = canvasRef.current.toDataURL("image/jpeg", 0.25);
+        // Compress to JPEG 0.1 quality (Reduced to lower latency)
+        const frame = canvasRef.current.toDataURL("image/jpeg", 0.1);
         socketClient.sendVideoFrame(frame);
       }
-    }, 100);
+    }, 200);
 
     // outputting "The play() request was interrupted by a call to pause()"
     // We can just clear srcObject and let GC handle it, or check promise.
@@ -65,5 +65,5 @@ export function VideoBroadcaster({ stream }: VideoBroadcasterProps) {
   }, [stream]);
 
   // Invisible canvas
-  return <canvas ref={canvasRef} width={150} height={150} className="hidden" />;
+  return <canvas ref={canvasRef} width={140} height={140} className="hidden" />;
 }
