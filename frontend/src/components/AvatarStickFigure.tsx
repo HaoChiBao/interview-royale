@@ -15,6 +15,7 @@ interface AvatarStickFigureProps {
   volume?: number; // 0 to 1
   onClick?: () => void;
   isChatting?: boolean;
+  hideNameTag?: boolean;
 }
 
 import idleImage from "@/assets/idle.png";
@@ -33,6 +34,7 @@ export function AvatarStickFigure({
   volume = 0,
   onClick,
   isChatting,
+  hideNameTag,
 }: AvatarStickFigureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -153,9 +155,11 @@ export function AvatarStickFigure({
       </div>
 
       {/* Name Label */}
-      <div className="mt-1 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded-full flex gap-1 items-center z-20 whitespace-nowrap">
-        {name} {isMe ? "(You)" : ""}
-      </div>
+      {!hideNameTag && (
+        <div className="mt-1 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded-full flex gap-1 items-center z-20 whitespace-nowrap">
+          {name} {isMe ? "(You)" : ""}
+        </div>
+      )}
 
       {/* Volume Indicator (Green Ring) */}
 

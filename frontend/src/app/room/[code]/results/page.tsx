@@ -65,112 +65,129 @@ export default function ResultsPage() {
     const myScore = leaderboard.find(l => l.username === me?.name)?.score || 0;
 
     return (
-        <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-white text-zinc-900 overflow-hidden relative">
-            {/* Logo Header */}
-            <div className="mb-4 animate-in slide-in-from-top-10 fade-in duration-700">
+        <main 
+            className="min-h-screen flex flex-col items-center justify-center p-8 bg-white text-zinc-900 font-sans overflow-hidden"
+            style={{ 
+              fontFamily: "SF Pro, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+              letterSpacing: "-0.5px"
+            }}
+        >
+            <LeaderboardOverlay />
+            
+            {/* 1. Header: Logo (Increased z-index to stay on top if needed, increased margin) */}
+            <div className="mb-4 relative z-50">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={titleImage.src} alt="Interview Royale" className="h-24 md:h-32 object-contain" />
+                <img src={titleImage.src} alt="Interview Royale" className="h-28 md:h-36 object-contain" />
             </div>
 
-            {/* My Score */}
-            <h2 className="text-xl md:text-2xl font-bold text-zinc-800 mb-12 animate-in fade-in duration-1000 delay-300">
-                Your Score: <span className="text-indigo-500">{myScore}pts</span>
+            {/* 2. My Score (Moved WAY up to avoid overlap) */}
+            <h2 className="text-3xl font-bold mb-40 relative z-40">
+                Your Score: <span className="text-blue-500">{myScore}pts</span>
             </h2>
 
-            {/* Podium Section */}
-            <div className="flex items-end justify-center gap-4 md:gap-8 mb-16 w-full max-w-4xl px-4 min-h-[300px]">
-                {/* 2nd Place */}
-                {top3[1] && (
-                    <div className="flex flex-col items-center animate-in slide-in-from-bottom-20 fade-in duration-700 delay-500 z-10">
-                        <div className="relative group">
-                            <div className="absolute -inset-4 bg-slate-200/50 rounded-full blur-xl group-hover:bg-slate-300/50 transition-colors" />
-                            <div className="bg-white p-3 rounded-xl shadow-xl -rotate-6 border-4 border-slate-300 relative z-10 w-[180px] md:w-[220px] flex flex-col items-center">
-                                <AvatarStickFigure 
-                                    name={top3[1].username}
-                                    isMe={top3[1].isMe}
-                                    stream={top3[1].isMe ? localStream : null}
-                                    lastVideoFrame={top3[1].playerObj?.lastVideoFrame}
-                                    cameraEnabled={true}
-                                    className="scale-90"
-                                />
-                                <div className="mt-2 text-center">
-                                    <div className="text-4xl font-black text-slate-300">#2</div>
-                                    <div className="font-bold text-slate-700 leading-tight">{top3[1].username}</div>
-                                    <div className="text-sm font-bold text-slate-400">{top3[1].score}pts</div>
+            {/* 3. Main Content: Podium + List */}
+            <div className="flex flex-col md:flex-row items-end justify-center gap-16 mb-16 w-full max-w-6xl px-4">
+                
+                {/* Podium Container - Compact height */}
+                <div className="relative flex items-end justify-center h-[260px] w-full max-w-3xl">
+                    
+                    {/* #2 (Left, Tilted -6deg) */}
+                    {top3[1] && (
+                        <div className="absolute left-0 bottom-4 z-20 transform -rotate-6 transition-transform hover:rotate-0 duration-300 origin-bottom-right">
+                             <div className="bg-white px-2 pt-2 pb-3 rounded-sm shadow-xl border-[6px] border-zinc-200 w-[160px] md:w-[200px] flex flex-col items-center rotate-[-2deg]">
+                                {/* Avatar Container - Allow overflow for head */}
+                                <div className="bg-zinc-200 w-full aspect-[16/10] rounded-sm mb-3 flex items-end justify-center relative">
+                                     <div className="absolute -bottom-6 transform scale-110">
+                                        <AvatarStickFigure 
+                                            name=""
+                                            isMe={top3[1].isMe}
+                                            stream={top3[1].isMe ? localStream : null}
+                                            lastVideoFrame={top3[1].playerObj?.lastVideoFrame}
+                                            cameraEnabled={true}
+                                            hideNameTag={true}
+                                        />
+                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* 1st Place - Center */}
-                {top3[0] && (
-                    <div className="flex flex-col items-center animate-in slide-in-from-bottom-32 fade-in duration-700 delay-700 z-20 -mx-4 md:mx-0 order-first md:order-none mb-8 md:mb-0">
-                        <div className="relative group">
-                             <div className="absolute -inset-4 bg-yellow-200/50 rounded-full blur-2xl group-hover:bg-yellow-300/50 transition-colors animate-pulse" />
-                             <div className="bg-white p-4 rounded-2xl shadow-2xl scale-110 border-4 border-yellow-400 relative z-10 w-[200px] md:w-[260px] flex flex-col items-center">
-                                <div className="absolute -top-6 text-5xl animate-bounce">👑</div>
-                                <AvatarStickFigure 
-                                    name={top3[0].username}
-                                    isMe={top3[0].isMe}
-                                    stream={top3[0].isMe ? localStream : null}
-                                    lastVideoFrame={top3[0].playerObj?.lastVideoFrame}
-                                    cameraEnabled={true}
-                                />
-                                <div className="mt-4 text-center">
-                                    <div className="text-5xl font-black text-yellow-400">#1</div>
-                                    <div className="text-xl font-bold text-zinc-800 leading-tight">{top3[0].username}</div>
-                                    <div className="font-bold text-yellow-600">{top3[0].score}pts</div>
+                                <div className="text-center w-full px-1">
+                                    <div className="text-5xl font-black text-zinc-300 leading-none mb-0.5">#2</div>
+                                    <div className="text-lg font-bold text-zinc-800 leading-tight truncate w-full">{top3[1].username}</div>
+                                    <div className="text-base font-bold text-zinc-400">{top3[1].score}pts</div>
                                 </div>
                              </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* 3rd Place */}
-                {top3[2] && (
-                    <div className="flex flex-col items-center animate-in slide-in-from-bottom-20 fade-in duration-700 delay-600 z-10">
-                        <div className="relative group">
-                            <div className="absolute -inset-4 bg-orange-200/50 rounded-full blur-xl group-hover:bg-orange-300/50 transition-colors" />
-                            <div className="bg-white p-3 rounded-xl shadow-xl rotate-6 border-4 border-orange-300 relative z-10 w-[180px] md:w-[220px] flex flex-col items-center">
-                                <AvatarStickFigure 
-                                    name={top3[2].username}
-                                    isMe={top3[2].isMe}
-                                    stream={top3[2].isMe ? localStream : null}
-                                    lastVideoFrame={top3[2].playerObj?.lastVideoFrame}
-                                    cameraEnabled={true}
-                                    className="scale-90"
-                                />
-                                <div className="mt-2 text-center">
-                                    <div className="text-4xl font-black text-orange-300">#3</div>
-                                    <div className="font-bold text-slate-700 leading-tight">{top3[2].username}</div>
-                                    <div className="text-sm font-bold text-orange-400">{top3[2].score}pts</div>
+                    {/* #3 (Right, Tilted +6deg) */}
+                    {top3[2] && (
+                        <div className="absolute right-0 bottom-4 z-10 transform rotate-6 transition-transform hover:rotate-0 duration-300 origin-bottom-left">
+                             <div className="bg-white px-2 pt-2 pb-3 rounded-sm shadow-xl border-[6px] border-orange-200 w-[160px] md:w-[200px] flex flex-col items-center rotate-[2deg]">
+                                <div className="bg-orange-200 w-full aspect-[16/10] rounded-sm mb-3 flex items-end justify-center relative">
+                                    <div className="absolute -bottom-6 transform scale-110">
+                                        <AvatarStickFigure 
+                                            name=""
+                                            isMe={top3[2].isMe}
+                                            stream={top3[2].isMe ? localStream : null}
+                                            lastVideoFrame={top3[2].playerObj?.lastVideoFrame}
+                                            cameraEnabled={true}
+                                            hideNameTag={true}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="text-center w-full px-1">
+                                    <div className="text-5xl font-black text-orange-300 leading-none mb-0.5">#3</div>
+                                    <div className="text-lg font-bold text-zinc-800 leading-tight truncate w-full">{top3[2].username}</div>
+                                    <div className="text-base font-bold text-orange-400">{top3[2].score}pts</div>
+                                </div>
+                             </div>
+                        </div>
+                    )}
+
+                    {/* #1 (Center, Straight, Scale 1.1) */}
+                    {top3[0] && (
+                        <div className="absolute bottom-6 z-30 transform scale-100 transition-transform hover:scale-105 duration-300">
+                             <div className="bg-white px-3 pt-3 pb-5 rounded-sm shadow-2xl border-[6px] border-yellow-300 w-[200px] md:w-[240px] flex flex-col items-center">
+                                <div className="bg-yellow-100 w-full aspect-[16/10] rounded-sm mb-4 flex items-end justify-center relative">
+                                     <div className="absolute -bottom-8 transform scale-125">
+                                         <AvatarStickFigure 
+                                            name=""
+                                            isMe={top3[0].isMe}
+                                            stream={top3[0].isMe ? localStream : null}
+                                            lastVideoFrame={top3[0].playerObj?.lastVideoFrame}
+                                            cameraEnabled={true}
+                                            hideNameTag={true}
+                                        />
+                                     </div>
+                                </div>
+                                <div className="text-center w-full px-1">
+                                    <div className="text-7xl font-black text-yellow-400 leading-none mb-0.5">#1</div>
+                                    <div className="text-xl font-bold text-zinc-800 leading-tight truncate w-full">{top3[0].username}</div>
+                                    <div className="text-lg font-bold text-yellow-500">{top3[0].score}pts</div>
+                                </div>
+                             </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Leaderboard List (Right side) */}
+                {rest.length > 0 && (
+                    <div className="flex flex-col gap-2 w-full max-w-xs pl-8 border-l-2 border-zinc-100/50">
+                        {rest.map((entry, idx) => (
+                            <div key={entry.username} className="flex items-center gap-4 bg-zinc-100 px-4 py-3 rounded-sm w-full">
+                                <span className="font-black text-zinc-800 text-lg">#{idx + 4}</span>
+                                <div className="flex-1 font-bold text-zinc-500 flex justify-between">
+                                    <span>{entry.username}</span>
+                                    <span>{entry.score}pts</span>
                                 </div>
                             </div>
-                        </div>
+                        ))}
                     </div>
                 )}
             </div>
 
-            {/* Remaining List */}
-            {rest.length > 0 && (
-                <div className="w-full max-w-lg space-y-2 mb-8 animate-in fade-in duration-700 delay-1000">
-                    {rest.map((entry, idx) => (
-                        <div key={entry.username} className="flex items-center justify-between bg-zinc-100 p-3 rounded-lg border border-zinc-200">
-                             <div className="flex items-center gap-4">
-                                <span className="font-black text-zinc-400 text-lg">#{idx + 4}</span>
-                                <span className="font-bold text-zinc-700">{entry.username}</span>
-                             </div>
-                             <span className="font-bold text-zinc-500">{entry.score}pts</span>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* Back Button */}
+            {/* 4. Footer: Back Button */}
             <Button 
                 onClick={handleHome}
-                className="bg-zinc-900 text-white hover:bg-zinc-800 text-lg px-8 py-6 rounded-xl font-bold shadow-xl transition-transform hover:scale-105 active:scale-95 animate-in fade-in duration-700 delay-1000"
+                className="bg-black text-white hover:bg-zinc-800 text-xl px-10 py-6 rounded-xl font-medium shadow-xl transition-transform hover:scale-105 active:scale-95"
             >
                 Back To Home
             </Button>

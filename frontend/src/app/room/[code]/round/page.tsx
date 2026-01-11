@@ -10,7 +10,6 @@ import { Timer } from "@/components/Timer";
 import { PlayerGrid } from "@/components/PlayerGrid";
 import { getMediaStream } from "@/lib/media";
 import { socketClient } from "@/lib/socket";
-import { DebugLogButton } from "@/components/DebugLogButton";
 import { VideoBroadcaster } from "@/components/VideoBroadcaster";
 import { SpeechTextarea } from "@/components/SpeechTextarea";
 import { IntermissionCanvas } from "@/components/IntermissionCanvas";

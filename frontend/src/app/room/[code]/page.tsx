@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Copy, Play } from "lucide-react";
 import { getMediaStream } from "@/lib/media";
 import { socketClient } from "@/lib/socket";
-import { DebugLogButton } from "@/components/DebugLogButton";
 import { VideoBroadcaster } from "@/components/VideoBroadcaster";
 import { LeaderboardOverlay } from "@/components/LeaderboardOverlay";
 
@@ -134,7 +133,6 @@ export default function LobbyPage() {
           <IntermissionCanvas localStream={localStream} />
       </div>
 
-      <DebugLogButton />
       {localStream && <VideoBroadcaster stream={localStream} />}
 
       {/* Animation Overlay */}
